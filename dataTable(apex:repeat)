@@ -1,0 +1,40 @@
+<div class="slds-m-top_small slds-page-header__row slds-page-header__row_gutters">
+                <div class="slds-page-header__col-details">
+                    <table class="slds-table slds-table_cell-buffer slds-table_bordered">
+                        <thead>
+                            <tr class="slds-line-height_reset">
+                                <th class="" scope="col">
+                                    <div class="slds-truncate" title="Opportunity Name">ORDER ITEM ID</div>
+                                </th>
+                                <th class="" scope="col">
+                                    <div class="slds-truncate" title="Account Name">PRODUCT NAME</div>
+                                </th>
+                                <th class="" scope="col">
+                                    <div class="slds-truncate" title="Close Date">BARCODE</div>
+                                </th>
+                                <th class="" scope="col">
+                                    <div class="slds-truncate" title="Stage">QUANTITY</div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <apex:repeat value="{!displayInventoryList}" var="orderItm">
+                                <tr class="slds-hint-parent">
+                                    <td data-label="OrderItem ID">
+                                        <div class="slds-truncate" title="Cloudhub">{!orderItm.id}</div>
+                                    </td>
+                                    <td data-label="PRODUCT Name"> 
+                                        <div class="slds-truncate" title="4/14/2015">{!orderItm.Product2.Name}</div>
+                                    </td>
+                                    <td data-label="BARCODE">
+                                        <div class="slds-truncate" title="Prospecting">{!orderItm.Barcode__c}</div>
+                                    </td>
+                                    <td data-label="QUANTITY">
+                                        <div class="slds-truncate" title="20%">{!orderItm.Quantity}</div>
+                                    </td>
+                                </tr>
+                            </apex:repeat>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
