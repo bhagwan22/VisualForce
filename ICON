@@ -1,0 +1,16 @@
+// to add icons to vf page 
+// include
+<apex:slds />
+    <body xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <span class="slds-icon_container slds-icon-standard-opportunity">
+        <svg class="slds-icon slds-page-header__icon" aria-hidden="true">
+            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#record')}" />
+        </svg>
+    </span>
+    
+    <apex:commandLink style="height: 2rem;margin-left: 0.5rem;" styleClass="slds-button slds-button_neutral" action="{!refreshPage}" > 
+        <svg class="slds-button__icon" aria-hidden="true"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#reset_password')}" /></svg>
+    </apex:commandLink>
+    
+ </body>
+ 
