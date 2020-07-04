@@ -1,0 +1,561 @@
+/***************************************************************************************************************************************************************
+* Description  :  Lab Management VF controller
+* Helper class  :  LabManagement_Helper
+* _____________________________________________________________________________________________________________________________________________________________
+* Version : 01       
+***************************************************************************************************************************************************************/
+
+public class Lab_Management_Controller {
+    
+    public String successMsgcolor='';
+    public String errorMsgcolor='';
+    
+    //ERROR FILE
+    public String phenoLogButtonToggel{get;set;}
+    public String phenoErrorFile {get;set;}
+    
+    public String reviewLogButtonToggel{get;set;}
+    public String reviewErrorFile {get;set;}
+    
+    public String swabArriveLogButtonToggel{get;set;}
+    public String swabArriveErrorFile {get;set;}
+    
+    public String dnaLogButtonToggel{get;set;}
+    public String dnaErrorFile {get;set;}
+    
+    public String genoTypeButtonToggel{get;set;}
+    public String genoTypeErrorFile {get;set;}
+    
+    //ERROR vs SUCCESS MESSAGE
+    public String toggelSwabMSG {get;set;}
+    public String swabMSGcolor {get;set;}
+    public string apexSwabResult{get;set;}
+    
+    public String toggelDNAMSG {get;set;}
+    public String dnaMSGcolor {get;set;}
+    public string apexDNAResult{get;set;}
+    
+    public String toggelGenotypeMSG {get;set;}
+    public String genotypeMSGcolor {get;set;}
+    public string apexGenoResult{get;set;}
+    
+    public String toggelReviewMSG {get;set;}
+    public String reviewMSGcolor {get;set;}
+    public string apexReviewResult{get;set;}
+    
+    public String toggelfinalResultMSG {get;set;}
+    public String resultMSGcolor {get;set;}
+    public string apexFinalResult{get;set;}
+    
+    
+    // FOR INPUT FIELD
+    public Blob swabsCSVFileBody{get;set;}
+    public string swabsCSVName{get;set;}
+    
+    public Blob dnaCSVFileBody{get;set;}
+    public string dnaCSVName{get;set;}
+    
+    public Blob genoCSVFileBody{get;set;}
+    public string genoCSVName{get;set;}
+    
+    public Blob reviewCSVFileBody{get;set;}
+    public string reviewCSVName{get;set;}
+    
+    public Blob resultCSVFileBody{get;set;}
+    public string resultCSVName{get;set;}
+    
+    // CSV TEMPLATE ID
+    public Id arrivedSwabTemplate { get; set; }
+    public id dnaExtractTemplate { get; set; } 
+    public Id genoTypeTemplate { get; set; }
+    public id reviewTemplate { get; set; } 
+    public Id resultReadyTemplate { get; set; }
+    
+    // DATA TABLE SET's
+    public List<TimeLine__c> updatedSwabsSet { get; set; }
+    public List<LabManagemntResults_wrapper> updatedDNAResult{get;set;}
+    public List<LabManagemntResults_wrapper> updatedGenoTypeResult{get;set;}
+    public List<TimeLine__c> updatedReviewResult { get; set; }   
+    public List<Pheotype_info__c> updatedResultSet { get; set; }
+    
+    public List<Contact> displayBarcodeUpdated{get;set;}
+    
+    public Set<string> activatedBarcodes = new Set<String>();
+    
+    //CONSTRUCTIO
+    public Lab_Management_Controller(){
+        toggelSwabMSG='none';
+        toggelDNAMSG = 'none';
+        toggelGenotypeMSG= 'none';
+        toggelReviewMSG= 'none';
+        toggelfinalResultMSG= 'none';
+        phenoLogButtonToggel='none';
+        reviewLogButtonToggel='none';
+        swabArriveLogButtonToggel='none';
+        dnaLogButtonToggel='none';
+        genoTypeButtonToggel='none';
+        phenoErrorFile='';
+        reviewErrorFile='';
+        swabArriveErrorFile='';
+        dnaErrorFile='';
+        genoTypeErrorFile='';
+        successMsgcolor= System.label.Success_Msg_color;
+        errorMsgcolor= System.label.Error_Msg_Color;
+        system.debug('###### WHEN IT IS CREATED');
+        arrivedSwabTemplate = System.label.Lab_Mngmt_Swabs_arrived;
+        dnaExtractTemplate = System.label.DNA_extraction_CSV;
+        genoTypeTemplate = System.label.Genotyping_CSV_Id;
+        reviewTemplate = System.label.Review_CSV_Id;
+        resultReadyTemplate = System.label.Result_Ready_CSV_Id;
+        
+        updatedSwabsSet =new List<TimeLine__c>();
+        updatedDNAResult =new List<LabManagemntResults_wrapper>();
+        updatedGenoTypeResult =new List<LabManagemntResults_wrapper>();
+        updatedReviewResult =new List<TimeLine__c>();
+        updatedResultSet =new List<Pheotype_info__c>();
+        
+        for(Contact con : [Select id,Barcode__c from Contact where Barcode__c!=null]){
+            activatedBarcodes.add(con.Barcode__c.Trim());
+        }
+    }    
+    
+    /********************************************************************************************************************************
+* Description     : Call Swabs arrival CSV parsing helper methods
+* Return Type     : void
+* ------------------------------------------------------------------------------------------------------------------------------
+* Helper method    : LabManagement_Helper
+* ******************************************************************************************************************************/
+    public void parseSwabFile(){
+        try{
+            system.debug('*** TEST SWAB');
+            Map<String,String> successErrorFiles = new Map<String,String>();
+            String csvBody = '';
+            system.debug('###@@ BLOB VALUE '+swabsCSVFileBody);
+            csvBody = swabsCSVFileBody.toString();
+            system.debug('###@@ STRING VALUE '+csvBody);
+            system.debug('###@@ STRING BLOB VALUE '+Blob.valueOf(csvBody));
+            List<TimeLine__c> displayInsert = new List<TimeLine__c>();
+            system.debug('#### SWABS FILE NAME '+swabsCSVName);
+            if(csvBody!='' && swabsCSVName=='Swabs arrived.csv'){
+                successErrorFiles = LabManagement_Helper.parseArriveSwabCSV(csvBody,swabsCSVName,activatedBarcodes);
+                swabsCSVFileBody=null;
+                csvBody='';
+                swabsCSVName='';
+                if(successErrorFiles.get('SUCCESS')!=''){
+                    List<String> timeLineId_List = successErrorFiles.get('SUCCESS').split(',');
+                    system.debug('@@@@ SF ID '+timeLineId_List );
+                    displayInsert = [Select id,patient__r.barcode__c from TimeLine__c where id IN:timeLineId_List];
+                }
+                if(successErrorFiles.get('ERROR').trim()!='BARCODE/SF id ,ERROR' && successErrorFiles.get('ERROR')!='' && successErrorFiles.get('ERROR')!=null){
+                    swabArriveLogButtonToggel = 'block';
+                    system.debug('***@@@ BLOCK');
+                    system.debug('#### ERROR SIZE ==> '+successErrorFiles.get('ERROR'));
+                    system.debug('#### SIZE ==> '+successErrorFiles.get('ERROR').length());
+                    swabArriveErrorFile =JSON.serialize(successErrorFiles.get('ERROR'));
+                }
+                else{
+                    system.debug('***@@@ NONE');
+                    swabArriveLogButtonToggel = 'none';
+                    swabArriveErrorFile='NO EXCEPTION ENCOUNTERED';
+                }
+                if(displayInsert==null || displayInsert.isEmpty()){
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'No Patient TimeLine Updated, Please check CSV'));
+                    swabMSGcolor=System.label.Error_Msg_color;
+                    apexSwabResult = 'No Patient TimeLine Updated, Please check CSV';
+                    toggelSwabMSG='block';
+                }
+                else{
+                    updatedSwabsSet.addAll(displayInsert);
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.CONFIRM,'Patient TimeLine Updated'));
+                    swabMSGcolor=System.label.Success_Msg_color;
+                    apexSwabResult = 'SUCCESS! Patient TimeLine Updated';
+                    toggelSwabMSG='block';
+                }
+            }
+            else{
+                //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'Please check file Name')); 
+                system.debug('***@@@ name NONE');
+                swabArriveLogButtonToggel = 'none';
+                swabArriveErrorFile='NO EXCEPTION ENCOUNTERED';
+                swabMSGcolor=System.label.Error_Msg_color;
+                apexSwabResult = 'PROBLEM! Please check file name';
+                toggelSwabMSG='block';
+                swabsCSVFileBody=null;
+                csvBody='';
+                swabsCSVName='';
+            }
+        }
+        catch (Exception e)
+        {
+            swabsCSVFileBody=null;
+            swabsCSVName='';
+            system.debug('*** EXCEPTION ENCOUNTER **** '); 
+        }  
+    }
+    
+    
+    /********************************************************************************************************************************
+* Description     : Call DNA CSV parsing helper methods
+* Return Type     : void
+* ------------------------------------------------------------------------------------------------------------------------------
+* Helper method    : LabManagement_Helper
+* ******************************************************************************************************************************/
+    public void parseDNAFile(){
+        try{
+            system.debug('*** TEST DNA');
+            Map<String,String> successErrorFiles = new Map<String,String>();
+            String csvBody = '';
+            system.debug('###@@ BLOB VALUE '+dnaCSVFileBody);
+            csvBody = dnaCSVFileBody.toString();
+            system.debug('###@@ STRING VALUE '+csvBody);
+            system.debug('###@@ STRING BLOB VALUE '+Blob.valueOf(csvBody));
+            List<LabManagemntResults_wrapper> displayInsert = new List<LabManagemntResults_wrapper>();
+            system.debug('#### DNA FILE NAME '+dnaCSVName);
+            if(csvBody!='' && dnaCSVName=='DNA extraction.csv'){
+                successErrorFiles = LabManagement_Helper.parseDnaExtractionCSV(csvBody,dnaCSVName,activatedBarcodes);
+                dnaCSVFileBody=null;
+                csvBody='';
+                dnaCSVName=''; 
+                
+                if(successErrorFiles.get('SUCCESS')!='' && successErrorFiles.get('SUCCESS')!=null){
+                    system.debug('####A '+successErrorFiles.get('SUCCESS'));
+                    system.debug('####B Searilize '+JSON.deserializeUntyped(successErrorFiles.get('SUCCESS')));
+                    Map<String,Object> tempSuccessResultMap = (Map<String,Object>)JSON.deserializeUntyped(successErrorFiles.get('SUCCESS'));
+                    system.debug('@@@@ SF RESULT '+tempSuccessResultMap );
+                    for(String mapKey : tempSuccessResultMap.keySet()){
+                        //Object labSuccesRec = tempSuccessResultMap.get(mapKey);
+                        Map<String,Object> labTestResultBody =(Map<String,Object>)tempSuccessResultMap.get(mapKey);
+                        system.debug('@@@@ SF RESULTX1 '+labTestResultBody );
+                        LabManagemntResults_wrapper wrapFill = new LabManagemntResults_wrapper();
+                        wrapFill.pBarcode =String.valueOf(labTestResultBody.get('pBarcode'));
+                        wrapFill.isTimeLineUpdt=Boolean.valueOf(labTestResultBody.get('isTimeLineUpdt'));
+                        wrapFill.isLabStuffUpdt=Boolean.valueOf(labTestResultBody.get('isLabStuffUpdt')); 
+                        displayInsert.add(wrapFill);
+                    }
+                    system.debug('@@@@ SF RESULT2 '+displayInsert );
+                }
+                if(successErrorFiles.get('ERROR').trim()!='BARCODE/SF id ,ERROR' && successErrorFiles.get('ERROR')!='' && successErrorFiles.get('ERROR')!=null){
+                    dnaLogButtonToggel = 'block';
+                    system.debug('***@@@ BLOCK');
+                    system.debug('#### ERROR SIZE ==> '+successErrorFiles.get('ERROR'));
+                    system.debug('#### SIZE ==> '+successErrorFiles.get('ERROR').length());
+                    dnaErrorFile =JSON.serialize(successErrorFiles.get('ERROR'));
+                }
+                else{
+                    system.debug('***@@@ NONE');
+                    dnaLogButtonToggel = 'none';
+                    dnaErrorFile='NO EXCEPTION ENCOUNTERED';
+                }
+                if(displayInsert==null || displayInsert.isEmpty()){
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'No Patient TimeLine Updated, Please check CSV'));
+                    dnaMSGcolor=errorMsgcolor;
+                    apexDNAResult = 'No Patient Time Line & lab stuffs record Updated, Please check CSV';
+                    toggelDNAMSG='block';
+                }
+                else{
+                    updatedDNAResult.addAll(displayInsert);
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.CONFIRM,'Patient TimeLine Updated'));
+                    dnaMSGcolor=successMsgcolor;
+                    apexDNAResult = 'SUCCESS! Record Updated';
+                    toggelDNAMSG='block';
+                }
+            }
+            else{
+                //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'Please check file Name')); 
+                system.debug('***@@@ fresh NONE');
+                dnaLogButtonToggel = 'none';
+                dnaErrorFile='NO EXCEPTION ENCOUNTERED';
+                dnaMSGcolor=errorMsgcolor;
+                apexDNAResult = 'PROBLEM! Please check file name';
+                toggelDNAMSG='block';
+                dnaCSVFileBody=null;
+                csvBody='';
+                dnaCSVName='';
+            }
+        }
+        catch (Exception e)
+        {
+            dnaCSVFileBody=null;
+            dnaCSVName='';
+            system.debug('*** EXCEPTION ENCOUNTER **** CAUSE '+e.getCause()+'\nLINE'+e.getLineNumber()+'\nMSG'+e.getMessage()); 
+        }  
+    }
+    
+    
+    /********************************************************************************************************************************
+* Description     : Call GENOTYPE CSV parsing helper methods
+* Return Type     : void
+* ------------------------------------------------------------------------------------------------------------------------------
+* Helper method    : LabManagement_Helper
+* ******************************************************************************************************************************/
+    public void parseGenotypeFile(){
+        try{
+            system.debug('*** TEST Genotype');
+            Map<String,String> successErrorFiles = new Map<String,String>();
+            String csvBody = '';
+            system.debug('###@@ BLOB VALUE '+genoCSVFileBody);
+            csvBody = genoCSVFileBody.toString();
+            system.debug('###@@ STRING VALUE '+csvBody);
+            system.debug('###@@ STRING BLOB VALUE '+Blob.valueOf(csvBody));
+            List<LabManagemntResults_wrapper> displayInsert = new List<LabManagemntResults_wrapper>();
+            system.debug('#### GENOTYPE FILE NAME '+genoCSVName);
+            if(csvBody!='' && genoCSVName=='Genotyping.csv'){
+                successErrorFiles = LabManagement_Helper.parseGenotypeCSV(csvBody,genoCSVName,activatedBarcodes);
+                genoCSVFileBody=null;
+                csvBody='';
+                genoCSVName='';
+                if(successErrorFiles.get('SUCCESS')!='' && successErrorFiles.get('SUCCESS')!=null){
+                    system.debug('####A '+successErrorFiles.get('SUCCESS'));
+                    system.debug('####B Searilize '+JSON.deserializeUntyped(successErrorFiles.get('SUCCESS')));
+                    Map<String,Object> tempSuccessResultMap = (Map<String,Object>)JSON.deserializeUntyped(successErrorFiles.get('SUCCESS'));
+                    system.debug('@@@@ SF RESULT '+tempSuccessResultMap );
+                    for(String mapKey : tempSuccessResultMap.keySet()){
+                        //Object labSuccesRec = tempSuccessResultMap.get(mapKey);
+                        Map<String,Object> labTestResultBody =(Map<String,Object>)tempSuccessResultMap.get(mapKey);
+                        system.debug('@@@@ SF RESULTX1 '+labTestResultBody );
+                        LabManagemntResults_wrapper wrapFill = new LabManagemntResults_wrapper();
+                        wrapFill.pBarcode =String.valueOf(labTestResultBody.get('pBarcode'));
+                        wrapFill.isTimeLineUpdt=Boolean.valueOf(labTestResultBody.get('isTimeLineUpdt'));
+                        wrapFill.isLabStuffUpdt=Boolean.valueOf(labTestResultBody.get('isLabStuffUpdt')); 
+                        displayInsert.add(wrapFill);
+                    }
+                    system.debug('@@@@ SF RESULT2 '+displayInsert );
+                }
+                if(successErrorFiles.get('ERROR').trim()!='BARCODE/SF id ,ERROR' && successErrorFiles.get('ERROR')!='' && successErrorFiles.get('ERROR')!=null){
+                    genoTypeButtonToggel = 'block';
+                    system.debug('***@@@ BLOCK');
+                    system.debug('#### ERROR SIZE ==> '+successErrorFiles.get('ERROR'));
+                    system.debug('#### SIZE ==> '+successErrorFiles.get('ERROR').length());
+                    genoTypeErrorFile =JSON.serialize(successErrorFiles.get('ERROR'));
+                }
+                else{
+                    system.debug('***@@@ NONE');
+                    genoTypeButtonToggel = 'none';
+                    genoTypeErrorFile='NO EXCEPTION ENCOUNTERED';
+                }
+                
+                if(displayInsert==null || displayInsert.isEmpty()){
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'No Patient TimeLine Updated, Please check CSV'));
+                    genotypeMSGcolor=errorMsgcolor;
+                    apexGenoResult = 'No Patient Time Line & lab stuffs record Updated, Please check CSV';
+                    toggelGenotypeMSG='block';
+                }
+                else{
+                    updatedGenoTypeResult.addAll(displayInsert);
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.CONFIRM,'Patient TimeLine Updated'));
+                    genotypeMSGcolor=successMsgcolor;
+                    apexGenoResult = 'SUCCESS! Record Updated';
+                    toggelGenotypeMSG='block';
+                }
+            }
+            else{
+                //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'Please check file Name')); 
+                 system.debug('***@@@ fresh NONE');
+                genoTypeButtonToggel = 'none';
+                genoTypeErrorFile='NO EXCEPTION ENCOUNTERED';
+                genotypeMSGcolor=errorMsgcolor;
+                apexGenoResult = 'PROBLEM! Please check file name';
+                toggelGenotypeMSG='block';
+                genoCSVFileBody=null;
+                csvBody='';
+                genoCSVName='';
+            }
+        }
+        catch (Exception e)
+        {
+            genoCSVFileBody=null;
+            genoCSVName='';
+            system.debug('*** EXCEPTION ENCOUNTER **** '); 
+        }  
+    }
+    
+    
+    /********************************************************************************************************************************
+* Description     : Call Review CSV parsing helper methods
+* Return Type     : void
+* ------------------------------------------------------------------------------------------------------------------------------
+* Helper method    : LabManagement_Helper
+* ******************************************************************************************************************************/
+    public void parseReviewFile(){
+        try{
+            system.debug('*** TEST REVIEW');
+            Map<String,String> successErrorFiles = new Map<String,String>();
+            String csvBody = '';
+            system.debug('###@@ BLOB VALUE '+reviewCSVFileBody);
+            csvBody = reviewCSVFileBody.toString();
+            system.debug('###@@ STRING VALUE '+csvBody);
+            system.debug('###@@ STRING BLOB VALUE '+Blob.valueOf(csvBody));
+            List<TimeLine__c> displayInsert = new List<TimeLine__c>();
+            system.debug('#### REVIEW FILE NAME '+reviewCSVName);
+            if(csvBody!='' && reviewCSVName=='Review.csv'){
+                successErrorFiles = LabManagement_Helper.parseReviewCSV(csvBody,reviewCSVName,activatedBarcodes);
+                reviewCSVFileBody=null;
+                csvBody='';
+                reviewCSVName='';
+                if(successErrorFiles.get('SUCCESS')!=''){
+                    List<String> timeLineId_List = successErrorFiles.get('SUCCESS').split(',');
+                    system.debug('@@@@ SF ID '+timeLineId_List );
+                    displayInsert = [Select id,patient__r.barcode__c from TimeLine__c where id IN:timeLineId_List];
+                }
+                if(successErrorFiles.get('ERROR').trim()!='BARCODE/SF id ,ERROR' && successErrorFiles.get('ERROR')!='' && successErrorFiles.get('ERROR')!=null){
+                    reviewLogButtonToggel = 'block';
+                    system.debug('***@@@ BLOCK');
+                    system.debug('#### ERROR SIZE ==> '+successErrorFiles.get('ERROR'));
+                    system.debug('#### SIZE ==> '+successErrorFiles.get('ERROR').length());
+                    reviewErrorFile =JSON.serialize(successErrorFiles.get('ERROR'));
+                }
+                else{
+                    system.debug('***@@@ NONE');
+                    reviewLogButtonToggel = 'none';
+                    reviewErrorFile='NO EXCEPTION ENCOUNTERED';
+                }
+                
+                if(displayInsert==null || displayInsert.isEmpty()){
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'No Patient TimeLine Updated, Please check CSV'));
+                    reviewMSGcolor =System.label.Error_Msg_color;
+                    apexReviewResult = 'No Patient TimeLine Updated, Please check CSV';
+                    toggelReviewMSG ='block';
+                }
+                else{
+                    updatedReviewResult.addAll(displayInsert);
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.CONFIRM,'Patient TimeLine Updated'));
+                    reviewMSGcolor =System.label.Success_Msg_color;
+                    apexReviewResult = 'SUCCESS! Patient TimeLine Updated';
+                    toggelReviewMSG ='block';
+                }
+            }
+            else{
+                //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'Please check file Name')); 
+                system.debug('***@@@name NONE');
+                reviewLogButtonToggel = 'none';
+                reviewErrorFile='NO EXCEPTION ENCOUNTERED';
+                reviewMSGcolor =System.label.Error_Msg_color;
+                apexReviewResult = 'PROBLEM! Please check file name';
+                toggelReviewMSG ='block';
+                reviewCSVFileBody=null;
+                csvBody='';
+                reviewCSVName='';
+            }
+        }
+        catch (Exception e)
+        {
+            reviewCSVFileBody=null;
+            reviewCSVName='';
+            system.debug('*** EXCEPTION ENCOUNTER **** '); 
+        }   
+    }
+    
+    
+    
+    /********************************************************************************************************************************
+* Description     : Call Final Result(PhenoType) CSV parsing helper methods
+* Return Type     : void
+* ------------------------------------------------------------------------------------------------------------------------------
+* Helper method    : LabManagement_Helper
+* ******************************************************************************************************************************/
+    public void parseFinalResultFile(){
+        try{
+            phenoErrorFile='';
+            system.debug('*** TEST FINAL RESULT');
+            Map<String,String> successErrorFiles = new Map<String,String>();
+            String csvBody = '';
+            system.debug('###@@ BLOB VALUE '+resultCSVFileBody);
+            csvBody = resultCSVFileBody.toString();
+            system.debug('###@@ STRING VALUE '+csvBody);
+            system.debug('###@@ STRING BLOB VALUE '+Blob.valueOf(csvBody));
+            List<Pheotype_info__c> displayInsert = new List<Pheotype_info__c>();
+            system.debug('#### FINAL RESULT NAME '+resultCSVName);
+            if(csvBody!='' && resultCSVName=='Phenotype.csv'){
+                //displayInsert = LabManagement_Helper.parsePhenotypeCSV(csvBody,resultCSVName,activatedBarcodes);
+                successErrorFiles = LabManagement_Helper.parsePhenotypeCSV(csvBody,resultCSVName,activatedBarcodes);
+                if(successErrorFiles.get('SUCCESS')!=''){
+                    List<String> PheotypeId_List = successErrorFiles.get('SUCCESS').split(',');
+                    system.debug('@@@@ SF ID '+PheotypeId_List );
+                    displayInsert = [Select id,patient__r.barcode__c from Pheotype_info__c where id IN:PheotypeId_List];
+                }
+                if(successErrorFiles.get('ERROR').trim()!='BARCODE/SF id ,ERROR' && successErrorFiles.get('ERROR')!='' && successErrorFiles.get('ERROR')!=null){
+                    phenoLogButtonToggel = 'block';
+                    system.debug('***@@@ BLOCK');
+                    system.debug('#### ERROR SIZE ==> '+successErrorFiles.get('ERROR'));
+                    system.debug('#### SIZE ==> '+successErrorFiles.get('ERROR').length());
+                    phenoErrorFile =JSON.serialize(successErrorFiles.get('ERROR'));
+                }
+                else{
+                    system.debug('***@@@ NONE');
+                    phenoLogButtonToggel = 'none';
+                    phenoErrorFile='NO EXCEPTION ENCOUNTERED';
+                }
+                
+                system.debug('@@@@ERROR '+phenoErrorFile);
+                system.debug('@@@@ SF ERROR '+phenoErrorFile);
+                resultCSVFileBody=null;
+                csvBody='';
+                resultCSVName='';
+                if(displayInsert==null || displayInsert.isEmpty()){
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'No Patient TimeLine Updated, Please check CSV'));
+                    resultMSGcolor  =System.label.Error_Msg_color;
+                    apexFinalResult = 'No Patient PhenoType Updated, Please check CSV';
+                    toggelfinalResultMSG  ='block';
+                    //phenoLogButtonToggel = 'none';
+                }
+                else{
+                    updatedResultSet.addAll(displayInsert);
+                    //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.CONFIRM,'Patient TimeLine Updated'));
+                    resultMSGcolor  =System.label.Success_Msg_color;
+                    apexFinalResult = 'SUCCESS! Patient PhenoType Updated';
+                    toggelfinalResultMSG  ='block';
+                }
+            }
+            else{
+                //ApexPages.addmessage(new ApexPages.message(ApexPages.severity.FATAL,'Please check file Name')); 
+                system.debug('***@@@ name NONE');
+                phenoLogButtonToggel = 'none';
+                phenoErrorFile='NO EXCEPTION ENCOUNTERED';
+                resultMSGcolor  =System.label.Error_Msg_color;
+                apexFinalResult = 'PROBLEM! Please check file name';
+                toggelfinalResultMSG  ='block';
+                resultCSVFileBody=null;
+                csvBody='';
+                resultCSVName='';
+            }
+        }
+        catch (Exception e)
+        {
+            resultCSVFileBody=null;
+            resultCSVName='';
+            system.debug('*** EXCEPTION ENCOUNTER **** '+e.getLineNumber()+' msg=> '+e.getMessage()); 
+        }   
+    }
+    
+    /********************************************************************************************************************************
+* Description     : Refresh page
+* Return Type     : PageReference 
+* ------------------------------------------------------------------------------------------------------------------------------
+* Helper method    : No
+* ******************************************************************************************************************************/
+    public PageReference refreshPage() {
+        dnaCSVFileBody = null;
+        dnaCSVName = '';
+        genoCSVFileBody = null;
+        genoCSVName = '';
+        reviewCSVFileBody = null;
+        reviewCSVName = '';
+        resultCSVFileBody = null;
+        resultCSVName = '';
+        PageReference tempPage = ApexPages.currentPage();            
+        tempPage.setRedirect(true);
+        return tempPage;
+    }
+    
+    /********************************************************************************************************************************
+* Description     : Refresh msg
+* Return Type     : void 
+* ------------------------------------------------------------------------------------------------------------------------------
+* Helper method    : No
+* ******************************************************************************************************************************/
+    public void hideMsg() {
+        system.debug('*** HIDE METHOD ***');
+        // toggelSwabMSG='none';
+    }
+    
+}
