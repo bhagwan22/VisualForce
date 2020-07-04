@@ -1,0 +1,1131 @@
+/***************************************************************************************************************************************************************
+* Description  :  Helper class for Lab_Management_Controller
+***************************************************************************************************************************************************************/
+
+public class LabManagement_Helper {
+    public  static Map<string,Integer> headerIndex = new Map<String,Integer>();// Set Dynamic Column Index from CSV
+    public  static String errorCSV = 'BARCODE/SF id ,ERROR';
+    public  static String successCSV = 'BARCODE,SUCCESS\n';
+    
+    /********************************************************************************************************************************
+* Description     : Parse Swab arrivedts for Time Line record update
+* Return Type     : list<String> Updated Patiend Barcodes List
+* ------------------------------------------------------------------------------------------------------------------------------
+* class called    : No
+* ******************************************************************************************************************************/
+    public static /*List<TimeLine__c>*/ Map<String,String> parseArriveSwabCSV(string stringBody,string attachmentName,Set<String> activatedBarcodes){
+        system.debug('**** HELPER CALLED ***');
+        system.debug('*** BODY '+stringBody);
+        system.debug('*** NAME '+attachmentName);
+        
+        List<String> csvFileLines = new List<String>();
+        List<TimeLine__c> barcodeForDataTable = new List<TimeLine__c>();
+        List<String> updatedBarcodeList = new List<String>();
+        Set<String>  parsedBarcode_List = new Set<String>();
+        Map<String,String> resultSuccessError = new Map<String,String>();
+        resultSuccessError.put('SUCCESS',null);
+        resultSuccessError.put('ERROR',errorCSV);
+        String swabArriveSFIds = '';//swabArriveSFIds
+        
+        try{
+            if(stringBody!='')
+                csvFileLines = stringBody.split('\n'); 
+            
+            if(!csvFileLines.isEmpty()){
+                // IDENTIFY .CSV HEADDER INDEX
+                integer indexCheck = 0;
+                for(String index : csvFileLines[0].split(',')){
+                    if(index.trim()=='Barcode')
+                        headerIndex.put(index.trim(),indexCheck);                
+                    indexCheck++;
+                }
+                System.debug('#### HEADDER MAP SIZE '+headerIndex.keySet().size());
+                System.debug('#### HEADDER MAP '+headerIndex);
+                if(headerIndex.keySet().size()!=1)
+                    return resultSuccessError;
+                // return barcodeForDataTable;
+                
+                //ITERATE CSV ROWS
+                for(Integer i=1;i<csvFileLines.size();i++){
+                    system.debug('**ROWS '+i+' ==> '+csvFileLines[i]);
+                    List<String> columnList = new List<String>();
+                    columnList = csvFileLines[i].split(',');
+                    system.debug('### clolumn Size ==> '+columnList.size());
+                    
+                    //ITERATE CSV COLUMN
+                    /* for(Integer j=0;j<headerIndex.size();j++){
+if(columnList[j]!=null)
+parsedBarcode_List.add(columnList[j].trim()); 
+} */
+                    
+                    //LIST OF BARCODE(active OR inactive)
+                    if(columnList.size()>=headerIndex.get('Barcode')+1){
+                        if(!activatedBarcodes.isEmpty() && activatedBarcodes.contains(columnList[headerIndex.get('Barcode')].trim())){
+                            parsedBarcode_List.add(columnList[headerIndex.get('Barcode')].trim());
+                        }
+                        else if(activatedBarcodes.isEmpty() || !activatedBarcodes.contains(columnList[headerIndex.get('Barcode')].trim())){
+                            errorCSV+='\n'+columnList[headerIndex.get('Barcode')].trim()+', INACTIVE';
+                        }
+                    }
+                }
+            }
+            system.debug('**** PARSED BARCOD E*** '+parsedBarcode_List);
+            if(!parsedBarcode_List.isEmpty()){
+                Map<string,Timeline__c> sfPatient_vs_Timeline_Map = new Map<string,Timeline__c>();
+                for(TimeLine__c tmln : [Select id,Stage__c,Patient__c,Patient__r.Barcode__c from TimeLine__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:parsedBarcode_List]){
+                    TimeLine__c temp_Timeline = new TimeLine__c();
+                    temp_Timeline.id = tmln.id;
+                    temp_Timeline.Stage__c = 'Sample arrived at SP lab';
+                    sfPatient_vs_Timeline_Map.put(tmln.Patient__r.Barcode__c,temp_Timeline);
+                }
+                
+                //NOTIFY IF BARCODE DO NOT HAVE ACTIVE TIMELINE RECORD
+                if(!parsedBarcode_List.isEmpty()){
+                    if(sfPatient_vs_Timeline_Map.isEmpty()){
+                        for(String  keyBarcode : parsedBarcode_List){
+                             errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '+keyBarcode; 
+                        }
+                    }
+                    else{
+                        for(String  keyBarcode : parsedBarcode_List){
+                            if(!sfPatient_vs_Timeline_Map.containsKey(keyBarcode)) 
+                              errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '; 
+                        }
+                    }
+                }
+                
+                try{                
+                    if(!sfPatient_vs_Timeline_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING TIMELINE');
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.update(sfPatient_vs_Timeline_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### SUCCESS RESULT ### '+sr);
+                                updatedBarcodeList.add(sfPatient_vs_Timeline_Map.values()[trackerrorRow].id);
+                                successCSV += sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                swabArriveSFIds += sfPatient_vs_Timeline_Map.values()[trackerrorRow].id+',';
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    errorCSV+='\nERROR '+sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r+','+err.getFields();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch(Exception ex){
+                    System.debug('*** Exception encountered '+ex.getMessage()+' Line No: '+ex.getLineNumber());
+                }
+            }
+        }
+        catch(Exception ex){
+            System.debug('@@@@ EXCEPTION ENCOUNTER @@@@@ ');
+            errorCSV+='\n EXCEPTION ENCOUNTER: Please contact system admin,'+ex.getMessage()+' '+ex.getCause();  
+        }
+        
+        
+        system.debug('##### INSERTED ORDER ITEMS '+updatedBarcodeList);
+        system.debug('SUCCESS CSV ==> '+successCSV);
+        system.debug('Error CSV ==> '+errorCSV);
+        //return updatedBarcodeList;
+        //
+        resultSuccessError.put('SUCCESS',swabArriveSFIds); 
+        resultSuccessError.put('ERROR',errorCSV);
+        
+        return resultSuccessError;
+        
+        //return [Select id,patient__r.barcode__c from TimeLine__c where id IN:updatedBarcodeList];
+    }
+    
+    /********************************************************************************************************************************
+* Description     : Parse DNA extraction for Time Line and Lab stuff records
+* Return Type     : list<String> Updated Patiend Barcodes List
+* ------------------------------------------------------------------------------------------------------------------------------
+* class called    : No
+* ******************************************************************************************************************************/
+    public static/* Map<String,LabManagemntResults_wrapper>*/ Map<String,String>  parseDnaExtractionCSV(string stringBody,string attachmentName,Set<String> activatedBarcodes){
+        system.debug('**** DNA HELPER CALLED ***');
+        system.debug('*** BODY '+stringBody);
+        system.debug('*** NAME '+attachmentName);
+        
+        List<String> csvFileLines = new List<String>();
+        //List<String> updatedBarcodeList = new List<String>();
+        Set<String>  parsedBarcode_List = new Set<String>();
+        Map<String,LabManagemntResults_wrapper> dnaResult_Map = new Map<String,LabManagemntResults_wrapper>();
+        Map<String,CSVWrapper> patient_LabStuff_Map = new  Map<String,CSVWrapper>();
+        Map<String,String> resultSuccessError = new Map<String,String>();
+        resultSuccessError.put('SUCCESS',null);
+        resultSuccessError.put('ERROR',errorCSV);
+        
+        try{
+            if(stringBody!='')
+                csvFileLines = stringBody.split('\n'); 
+            
+            if(!csvFileLines.isEmpty()){
+                // IDENTIFY .CSV HEADDER INDEX
+                integer indexCheck = 0;
+                for(String index : csvFileLines[0].split(',')){
+                    if(index.trim()=='Barcode')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='DNA isolation')
+                        headerIndex.put(index.trim(),indexCheck);   
+                    if(index.trim()=='DNA concentration')
+                        headerIndex.put(index.trim(),indexCheck);   
+                    if(index.trim()=='DNA yield')
+                        headerIndex.put(index.trim(),indexCheck);   
+                    if(index.trim()=='Number swabs used')
+                        headerIndex.put(index.trim(),indexCheck);   
+                    indexCheck++;
+                }
+                System.debug('#### HEADDER MAP SIZE '+headerIndex.keySet().size());
+                System.debug('#### HEADDER MAP '+headerIndex);
+                if(headerIndex.keySet().size()!=5)
+                    return resultSuccessError;
+                //return dnaResult_Map;
+                
+                //ITERATE CSV ROWS
+                for(Integer i=1;i<csvFileLines.size();i++){
+                    system.debug('**ROWS '+i+' ==> '+csvFileLines[i]);
+                    List<String> columnList = new List<String>();
+                    columnList = csvFileLines[i].split(',');
+                    system.debug('### clolumn Size ==> '+columnList.size());
+                    
+                    //ITERATE CSV COLUMN
+                    //parsedBarcode_List.add(columnList[j].trim());
+                    string barcode_param='';
+                    decimal dnaConc_param=null;
+                    decimal dnaYield_param=null;
+                    decimal nsu_param=null;
+                    
+                    if(columnList.size()>=headerIndex.get('Barcode')+1)
+                        barcode_param = columnList[headerIndex.get('Barcode')].trim();
+                    if(columnList.size()>=headerIndex.get('DNA concentration')+1)
+                        dnaConc_param = decimal.valueof(columnList[headerIndex.get('DNA concentration')].trim());
+                    if(columnList.size()>=headerIndex.get('DNA yield')+1)
+                        dnaYield_param = decimal.valueof(columnList[headerIndex.get('DNA yield')].trim());
+                    if(columnList.size()>=headerIndex.get('Number swabs used')+1)
+                        nsu_param = decimal.valueof(columnList[headerIndex.get('Number swabs used')].trim());
+                    
+                    system.debug(i+''+'@@@ barcode_param'+barcode_param);
+                    system.debug(i+''+'@@@ dnaConc_param'+dnaConc_param);
+                    system.debug(i+''+'@@@ dnaYield_param'+dnaYield_param);
+                    system.debug(i+''+'@@@ nsu_param'+nsu_param);
+                    
+                    if(columnList.size()>=headerIndex.get('Barcode')+1){
+                        if(!activatedBarcodes.isEmpty() && activatedBarcodes.contains(barcode_param)){
+                            CSVWrapper wrapper = new CSVWrapper(barcode_param,dnaConc_param,dnaYield_param,nsu_param);
+                            patient_LabStuff_Map.put(barcode_param,wrapper);
+                            system.debug('@@@ INSIDER');
+                        }
+                        else if(activatedBarcodes.isEmpty() || !activatedBarcodes.contains(barcode_param)){
+                            errorCSV+='\n'+columnList[headerIndex.get('Barcode')].trim()+', INACTIVE';
+                            system.debug('@@@ OUTSIDE');
+                        }
+                    }
+                    /*  CSVWrapper wrapper = new CSVWrapper(barcode_param,dnaConc_param,dnaYield_param,nsu_param);
+patient_LabStuff_Map.put(barcode_param,wrapper);*/
+                }
+            }
+            system.debug('@@**** Patient to update *** '+patient_LabStuff_Map.keySet());
+            if(!patient_LabStuff_Map.keySet().isEmpty()){
+                Map<string,Timeline__c> sfPatient_vs_Timeline_Map = new Map<string,Timeline__c>();
+                Map<string,Lab_stuff__c>  sfPatient_vs_LabStuff_Map = new Map<string,Lab_stuff__c> ();
+                Map<string,Lab_stuff__c>  sfPatient_vs_LabStuff_Insert_Map = new Map<string,Lab_stuff__c> ();
+                //PATIENT TIME LINE RECORD
+                system.debug('** PATIENT TIMELINE RECORDS '+[Select id,Stage__c,Patient__c,Patient__r.Barcode__c from TimeLine__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:patient_LabStuff_Map.keySet()].size());
+                for(TimeLine__c tmln : [Select id,Stage__c,Patient__c,Patient__r.Barcode__c from TimeLine__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:patient_LabStuff_Map.keySet()]){
+                    tmln.Stage__c = 'DNA isolated';
+                    sfPatient_vs_Timeline_Map.put(tmln.Patient__r.Barcode__c,tmln);
+                }
+                
+                //NOTIFY IF BARCODE DO NOT HAVE ACTIVE TIMELINE RECORD
+                if(!patient_LabStuff_Map.isEmpty()){
+                    if(sfPatient_vs_Timeline_Map.isEmpty()){
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                             errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '+keyBarcode; 
+                        }
+                    }
+                    else{
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                            if(!sfPatient_vs_Timeline_Map.containsKey(keyBarcode)) 
+                              errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '; 
+                        }
+                    }
+                }
+                
+                // CREATING LAB STUFF RECORDS FOR ACTIVE PATIENT
+                for(Contact contct : [Select id, Barcode__c,(Select id,DNA_yield__c,Number_swabs_used__c,DNA_concentration__c,Patient__c,Patient__r.Barcode__c from Lab_stuffs__r limit 1) from Contact where Barcode__c!=null AND Barcode__c IN:patient_LabStuff_Map.keySet()]){
+                    if(contct.Lab_stuffs__r.size()==0){
+                        Lab_stuff__c newLbStuff = new Lab_stuff__c();
+                        newLbStuff.Patient__c = contct.id;
+                        newLbStuff.DNA_yield__c = patient_LabStuff_Map.get(contct.Barcode__c).dnaYield;
+                        newLbStuff.Number_swabs_used__c = String.valueOf(patient_LabStuff_Map.get(contct.Barcode__c).dnaNSU);
+                        newLbStuff.DNA_concentration__c = patient_LabStuff_Map.get(contct.Barcode__c).dnaConcentration;
+                        sfPatient_vs_LabStuff_Insert_Map.put(contct.Barcode__c,newLbStuff);
+                    }
+                }
+                
+                // UPDATING ACTIVE PATIENT LAB STUFF RECORD
+                system.debug('@@*** PATIENT LAB STUFF RECORD');
+                for(Lab_stuff__c labStuf : [Select id,DNA_yield__c,Number_swabs_used__c,DNA_concentration__c,Patient__c,Patient__r.Barcode__c from Lab_stuff__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:patient_LabStuff_Map.keySet()]){
+                    labStuf.DNA_yield__c = patient_LabStuff_Map.get(labStuf.Patient__r.Barcode__c).dnaYield;
+                    labStuf.Number_swabs_used__c = String.valueOf(patient_LabStuff_Map.get(labStuf.Patient__r.Barcode__c).dnaNSU);
+                    labStuf.DNA_concentration__c = patient_LabStuff_Map.get(labStuf.Patient__r.Barcode__c).dnaConcentration;
+                    sfPatient_vs_LabStuff_Map.put(labStuf.Patient__r.Barcode__c,labStuf);
+                }
+                
+                //NOTIFY IF BARCODE DO NOT HAVE ACTIVE LABSTUFF RECORD
+                /*
+                if(!patient_LabStuff_Map.isEmpty()){
+                    if(sfPatient_vs_LabStuff_Map.isEmpty()){
+                        system.debug('#### NO LABSTUB '+patient_LabStuff_Map.keySet());
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                           errorCSV+='\nBARCODE '+keyBarcode+' : LABSTUFF RECORD DO NOT EXIST: '+keyBarcode;
+                        }
+                    }
+                    else{
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                            if(!sfPatient_vs_LabStuff_Map.containsKey(keyBarcode)) 
+                              errorCSV+='\nBARCODE '+keyBarcode+' : LABSTUFF RECORD DO NOT EXIST: '; 
+                        }
+                        system.debug('#### NO LABSTUB '+errorCSV);
+                    }
+                }
+                */
+                
+                try{      
+                    //UPDATING TIMELINE
+                    if(!sfPatient_vs_Timeline_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING TIMELINE '+sfPatient_vs_Timeline_Map.values());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.update(sfPatient_vs_Timeline_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### TIMELINE SUCCESS RESULT ### '+sr);
+                                //updatedBarcodeList.add(sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                successCSV += 'Timeline : '+sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                timelnFinalResult.pBarcode = sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c;
+                                timelnFinalResult.isTimeLineUpdt = True;
+                                dnaResult_Map.put(sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### TIMELINE ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    //errorCSV+='\nTIMELINE ERROR'+' '+err.getFields();
+                                    errorCSV+='\nTIMELINE ERROR '+sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r+',Field: '+err.getFields()+' Msg: '+err.getMessage();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                    
+                     //INSERTING LAB STUFF
+                    if(!sfPatient_vs_LabStuff_Insert_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING Lab Stuff '+sfPatient_vs_LabStuff_Insert_Map.values());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.insert(sfPatient_vs_LabStuff_Insert_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### LAB STUFF SUCCESS RESULT ### '+sr);
+                                // updatedBarcodeList.add(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                successCSV += 'Lab stuff : '+sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                //Fill LabStuff Result
+                                if(!dnaResult_Map.isEmpty() && dnaResult_Map.containsKey(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c)){
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult = dnaResult_Map.get(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    dnaResult_Map.put(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                else{
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult.pBarcode = sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c;
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    dnaResult_Map.put(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### LAB STUFF insert ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    //errorCSV+='\n LAB STUFF ERROR'+' '+err.getFields();
+                                    errorCSV+='\nLAB STUFF ERROR '+sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r+',Field: '+err.getFields()+' Msg: '+err.getMessage();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    //UPDATING LAB STUFF
+                    if(!sfPatient_vs_LabStuff_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING Lab Stuff '+sfPatient_vs_LabStuff_Map.values());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.update(sfPatient_vs_LabStuff_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### LAB STUFF SUCCESS RESULT ### '+sr);
+                                // updatedBarcodeList.add(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                successCSV += 'Lab stuff : '+sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                //Fill LabStuff Result
+                                if(!dnaResult_Map.isEmpty() && dnaResult_Map.containsKey(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c)){
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult = dnaResult_Map.get(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    dnaResult_Map.put(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                else{
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult.pBarcode = sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c;
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    dnaResult_Map.put(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### LAB STUFF Update ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    //errorCSV+='\n LAB STUFF ERROR'+' '+err.getFields();
+                                    errorCSV+='\nLAB STUFF ERROR '+sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r+',Field: '+err.getFields()+' Msg: '+err.getMessage();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch(Exception ex){
+                    System.debug('*** Exception encountered '+ex.getMessage()+' Line No: '+ex.getLineNumber());
+                }
+            }
+        }
+        catch(Exception ex){
+            System.debug('@@@@ EXCEPTION ENCOUNTER @@@@@ ');
+            errorCSV+='\n EXCEPTION ENCOUNTER: Please contact system admin,'+ex.getMessage()+' '+ex.getCause();
+        }
+        
+        
+        system.debug('##### INSERTED TimeLine & Lab Stuff  '+dnaResult_Map+' ===> '+JSON.serialize(dnaResult_Map));
+        system.debug('SUCCESS CSV ==> '+successCSV);
+        system.debug('Error CSV ==> '+errorCSV);
+        
+        resultSuccessError.put('SUCCESS',JSON.serialize(dnaResult_Map)); 
+        resultSuccessError.put('ERROR',errorCSV);
+        
+        return resultSuccessError;
+        
+        // return dnaResult_Map;
+    }
+    
+    
+    
+    /********************************************************************************************************************************
+* Description     : Parse GenoType for Time Line and Lab stuff records
+* Return Type     : list<String> Updated Patiend Barcodes List
+* ------------------------------------------------------------------------------------------------------------------------------
+* class called    : No
+* ******************************************************************************************************************************/
+    public static /*Map<String,LabManagemntResults_wrapper>*/  Map<String,String>  parseGenotypeCSV(string stringBody,string attachmentName,Set<String> activatedBarcodes){
+        system.debug('**** GENOTYPE HELPER CALLED ***');
+        system.debug('*** BODY '+stringBody);
+        system.debug('*** NAME '+attachmentName);
+        
+        List<String> csvFileLines = new List<String>();
+        //List<String> updatedBarcodeList = new List<String>();
+        Set<String>  parsedBarcode_List = new Set<String>();
+        Map<String,LabManagemntResults_wrapper> genoTypeResult_Map = new Map<String,LabManagemntResults_wrapper>();
+        Map<String,CSVWrapper> patient_LabStuff_Map = new  Map<String,CSVWrapper>();
+        Map<String,String> resultSuccessError = new Map<String,String>();
+        resultSuccessError.put('SUCCESS',null);
+        resultSuccessError.put('ERROR',errorCSV);
+        
+        try{
+            if(stringBody!='')
+                csvFileLines = stringBody.split('\n'); 
+            
+            if(!csvFileLines.isEmpty()){
+                // IDENTIFY .CSV HEADDER INDEX
+                integer indexCheck = 0;
+                for(String index : csvFileLines[0].split(',')){
+                    if(index.trim()=='Barcode')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='GenoTyped')
+                        headerIndex.put(index.trim(),indexCheck);   
+                    if(index.trim()=='Call rate')
+                        headerIndex.put(index.trim(),indexCheck);    
+                    indexCheck++;
+                }
+                System.debug('#### HEADDER MAP SIZE '+headerIndex.keySet().size());
+                System.debug('#### HEADDER MAP '+headerIndex);
+                if(headerIndex.keySet().size()!=3)
+                    return resultSuccessError;
+                //return genoTypeResult_Map;
+                
+                //ITERATE CSV ROWS
+                for(Integer i=1;i<csvFileLines.size();i++){
+                    system.debug('**ROWS '+i+' ==> '+csvFileLines[i]);
+                    List<String> columnList = new List<String>();
+                    columnList = csvFileLines[i].split(',');
+                    system.debug('### clolumn Size ==> '+columnList.size());
+                    
+                    //ITERATE CSV COLUMN
+                    //parsedBarcode_List.add(columnList[j].trim());
+                    string barcode_param='';
+                    Integer callRate_param=null;
+                    
+                    if(columnList.size()>=headerIndex.get('Barcode')+1)
+                        barcode_param = columnList[headerIndex.get('Barcode')].trim();
+                    if(columnList.size()>=headerIndex.get('Call rate')+1)
+                        callRate_param = integer.valueof(columnList[headerIndex.get('Call rate')].trim());
+                    
+                    system.debug(i+''+'@@@ barcode_param'+barcode_param);
+                    system.debug(i+''+'@@@ callRate_param'+callRate_param);
+                    
+                    
+                    if(columnList.size()>=headerIndex.get('Barcode')+1){
+                        if(!activatedBarcodes.isEmpty() && activatedBarcodes.contains(barcode_param)){
+                            CSVWrapper wrapper = new CSVWrapper(barcode_param,callRate_param);
+                            patient_LabStuff_Map.put(barcode_param,wrapper);
+                            system.debug('@@@ INSIDER');
+                        }
+                        else if(activatedBarcodes.isEmpty() || !activatedBarcodes.contains(barcode_param)){
+                            errorCSV+='\n'+columnList[headerIndex.get('Barcode')].trim()+', INACTIVE';
+                            system.debug('@@@ OUTSIDE');
+                        }
+                    }
+                    
+                    
+                }
+            }
+            system.debug('@@**** Patient to update *** '+patient_LabStuff_Map.keySet());
+            if(!patient_LabStuff_Map.keySet().isEmpty()){
+                Map<string,Timeline__c> sfPatient_vs_Timeline_Map = new Map<string,Timeline__c>();
+                Map<string,Lab_stuff__c>  sfPatient_vs_LabStuff_Map = new Map<string,Lab_stuff__c> ();
+                Map<string,Lab_stuff__c>  sfPatient_vs_LabStuff_Insert_Map = new Map<string,Lab_stuff__c> ();
+                //PATIENT TIME LINE RECORD
+                system.debug('** PATIENT TIMELINE RECORDS '+[Select id,Stage__c,Patient__c,Patient__r.Barcode__c from TimeLine__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:patient_LabStuff_Map.keySet()].size());
+                for(TimeLine__c tmln : [Select id,Stage__c,Patient__c,Patient__r.Barcode__c from TimeLine__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:patient_LabStuff_Map.keySet()]){
+                    tmln.Stage__c = 'Genotyping done';
+                    sfPatient_vs_Timeline_Map.put(tmln.Patient__r.Barcode__c,tmln);
+                }
+                
+                //NOTIFY IF BARCODE DO NOT HAVE ACTIVE TIMELINE RECORD
+                if(!patient_LabStuff_Map.isEmpty()){
+                    if(sfPatient_vs_Timeline_Map.isEmpty()){
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                             errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '+keyBarcode; 
+                        }
+                    }
+                    else{
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                            if(!sfPatient_vs_Timeline_Map.containsKey(keyBarcode)) 
+                              errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '; 
+                        }
+                    }
+                }
+                
+                
+                // CREATING LAB STUFF RECORDS FOR ACTIVE PATIENT
+                for(Contact contct : [Select id, Barcode__c,(Select id,Call_rate__c,Patient__c,Patient__r.Barcode__c from Lab_stuffs__r limit 1) from Contact where Barcode__c!=null AND Barcode__c IN:patient_LabStuff_Map.keySet()]){
+                    if(contct.Lab_stuffs__r.size()==0){
+                        Lab_stuff__c newLbStuff = new Lab_stuff__c();
+                        newLbStuff.Patient__c = contct.id;
+                        newLbStuff.Call_rate__c = patient_LabStuff_Map.get(contct.Barcode__c).callRate;
+                        sfPatient_vs_LabStuff_Insert_Map.put(contct.Barcode__c,newLbStuff);
+                    }
+                }
+                
+                // UPDATING ACTIVE PATIENT LAB STUFF RECORD
+                system.debug('@@*** PATIENT LAB STUFF RECORD');
+                for(Lab_stuff__c labStuf : [Select id,Call_rate__c,Patient__c,Patient__r.Barcode__c from Lab_stuff__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:patient_LabStuff_Map.keySet()]){
+                    labStuf.Call_rate__c = patient_LabStuff_Map.get(labStuf.Patient__r.Barcode__c).callRate;
+                    sfPatient_vs_LabStuff_Map.put(labStuf.Patient__r.Barcode__c,labStuf);
+                }
+                
+                //NOTIFY IF BARCODE DO NOT HAVE ACTIVE LABSTUFF RECORD
+                /*
+                if(!patient_LabStuff_Map.isEmpty()){
+                    if(sfPatient_vs_LabStuff_Map.isEmpty()){
+                        system.debug('#### NO LABSTUB '+patient_LabStuff_Map.keySet());
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                             errorCSV+='\nBARCODE '+keyBarcode+' : LABSTUFF RECORD DO NOT EXIST: '+keyBarcode; 
+                        }
+                    }
+                    else{
+                        for(String  keyBarcode : patient_LabStuff_Map.keySet()){
+                            if(!sfPatient_vs_LabStuff_Map.containsKey(keyBarcode)) 
+                              errorCSV+='\nBARCODE '+keyBarcode+' : LABSTUFF RECORD DO NOT EXIST: '; 
+                        }
+                        system.debug('#### NO LABSTUB '+errorCSV);
+                    }
+                }
+                */
+                
+                try{      
+                    //UPDATING TIMELINE
+                    if(!sfPatient_vs_Timeline_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING TIMELINE '+sfPatient_vs_Timeline_Map.values());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.update(sfPatient_vs_Timeline_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### TIMELINE SUCCESS RESULT ### '+sr);
+                                //updatedBarcodeList.add(sfPatient_vs_Timeline_Map.values()[trackerrorRow].id);
+                                successCSV += 'Timeline : '+sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                timelnFinalResult.pBarcode = sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c;
+                                timelnFinalResult.isTimeLineUpdt = True;
+                                genoTypeResult_Map.put(sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### TIMELINE ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    //errorCSV+='\nTIMELINE ERROR'+' '+err.getFields();
+                                    errorCSV+='\nTIMELINE ERROR '+sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r+',Field: '+err.getFields()+' Msg: '+err.getMessage();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    
+                    
+                     //INSERTING LAB STUFF
+                    if(!sfPatient_vs_LabStuff_Insert_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING Lab Stuff '+sfPatient_vs_LabStuff_Insert_Map.values());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.insert(sfPatient_vs_LabStuff_Insert_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### LAB STUFF SUCCESS RESULT ### '+sr);
+                                // updatedBarcodeList.add(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                successCSV += 'Lab stuff : '+sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                //Fill LabStuff Result
+                                if(!genoTypeResult_Map.isEmpty() && genoTypeResult_Map.containsKey(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c)){
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult = genoTypeResult_Map.get(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    genoTypeResult_Map.put(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                else{
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult.pBarcode = sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c;
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    genoTypeResult_Map.put(sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### LAB STUFF INSERT ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    // errorCSV+='\n LAB STUFF ERROR'+' '+err.getFields();
+                                    errorCSV+='\nLAB STUFF ERROR '+sfPatient_vs_LabStuff_Insert_Map.values()[trackerrorRow].Patient__r+',Field: '+err.getFields()+' Msg: '+err.getMessage();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    
+                    
+                    //UPDATING LAB STUFF
+                    if(!sfPatient_vs_LabStuff_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING Lab Stuff '+sfPatient_vs_LabStuff_Map.values());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.update(sfPatient_vs_LabStuff_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### LAB STUFF SUCCESS RESULT ### '+sr);
+                                // updatedBarcodeList.add(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                successCSV += 'Lab stuff : '+sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                //Fill LabStuff Result
+                                if(!genoTypeResult_Map.isEmpty() && genoTypeResult_Map.containsKey(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c)){
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult = genoTypeResult_Map.get(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c);
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    genoTypeResult_Map.put(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                else{
+                                    LabManagemntResults_wrapper timelnFinalResult = new LabManagemntResults_wrapper();
+                                    timelnFinalResult.pBarcode = sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c;
+                                    timelnFinalResult.isLabStuffUpdt = True;
+                                    genoTypeResult_Map.put(sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r.Barcode__c,timelnFinalResult);
+                                }
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### LAB STUFF UPDATE ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    // errorCSV+='\n LAB STUFF ERROR'+' '+err.getFields();
+                                    errorCSV+='\nLAB STUFF ERROR '+sfPatient_vs_LabStuff_Map.values()[trackerrorRow].Patient__r+',Field: '+err.getFields()+' Msg: '+err.getMessage();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch(Exception ex){
+                    System.debug('*** Exception encountered '+ex.getMessage()+' Line No: '+ex.getLineNumber());
+                }
+            }
+        }
+        catch(Exception ex){
+            System.debug('@@@@ EXCEPTION ENCOUNTER @@@@@ ');
+            errorCSV+='\n EXCEPTION ENCOUNTER: Please contact system admin,'+ex.getMessage()+' '+ex.getCause();
+        }
+        
+        system.debug('##### INSERTED TimeLine & Lab Stuff  '+genoTypeResult_Map);
+        system.debug('SUCCESS CSV ==> '+successCSV);
+        system.debug('Error CSV ==> '+errorCSV);
+        
+        resultSuccessError.put('SUCCESS',JSON.serialize(genoTypeResult_Map)); 
+        resultSuccessError.put('ERROR',errorCSV);
+        
+        return resultSuccessError;
+        
+        //return genoTypeResult_Map;
+    }
+    
+    /********************************************************************************************************************************
+* Description     : Parse Review for Time Line record update
+* Return Type     : list<TimeLine__c> Updated Patiend Barcodes List
+* ------------------------------------------------------------------------------------------------------------------------------
+* class called    : No
+* ******************************************************************************************************************************/
+    public static Map<String,String>  /*List<TimeLine__c>*/ parseReviewCSV(string stringBody,string attachmentName,Set<String> activatedBarcodes){
+        system.debug('**** REVIEW HELPER CALLED ***');
+        system.debug('*** BODY '+stringBody);
+        system.debug('*** NAME '+attachmentName);
+        // 
+        Map<String,String> resultSuccessError = new Map<String,String>();
+        resultSuccessError.put('SUCCESS',null);
+        resultSuccessError.put('ERROR',errorCSV);
+        String timeLineIds = '';//timeLineIds
+        
+        List<String> csvFileLines = new List<String>();
+        List<TimeLine__c> barcodeForDataTable = new List<TimeLine__c>();
+        List<String> updatedBarcodeList = new List<String>();
+        Set<String>  parsedBarcode_List = new Set<String>();
+        
+        Try{
+            if(stringBody!='')
+                csvFileLines = stringBody.split('\n'); 
+            
+            if(!csvFileLines.isEmpty()){
+                // IDENTIFY .CSV HEADDER INDEX
+                integer indexCheck = 0;
+                for(String index : csvFileLines[0].split(',')){
+                    if(index.trim()=='Barcode')
+                        headerIndex.put(index.trim(),indexCheck);
+                    if(index.trim()=='Reviewed')
+                        headerIndex.put(index.trim(),indexCheck);                    
+                    indexCheck++;
+                }
+                System.debug('#### HEADDER MAP SIZE '+headerIndex.keySet().size());
+                System.debug('#### HEADDER MAP '+headerIndex);
+                if(headerIndex.keySet().size()!=2)
+                    return resultSuccessError;
+                // return barcodeForDataTable;
+                
+                
+                //ITERATE CSV ROWS
+                for(Integer i=1;i<csvFileLines.size();i++){
+                    system.debug('**ROWS '+i+' ==> '+csvFileLines[i]);
+                    List<String> columnList = new List<String>();
+                    columnList = csvFileLines[i].split(',');
+                    system.debug('### clolumn Size ==> '+columnList.size());
+                    /*
+//ITERATE CSV COLUMN
+if(columnList.size()>=headerIndex.get('Barcode')+1)
+parsedBarcode_List.add(columnList[headerIndex.get('Barcode')].trim());
+*/
+                    
+                    //LIST OF BARCODE(active OR inactive)
+                    if(columnList.size()>=headerIndex.get('Barcode')+1){
+                        if(!activatedBarcodes.isEmpty() && activatedBarcodes.contains(columnList[headerIndex.get('Barcode')].trim())){
+                            parsedBarcode_List.add(columnList[headerIndex.get('Barcode')].trim());
+                        }
+                        else if(activatedBarcodes.isEmpty() || !activatedBarcodes.contains(columnList[headerIndex.get('Barcode')].trim())){
+                            errorCSV+='\n'+columnList[headerIndex.get('Barcode')].trim()+', INACTIVE';
+                        }
+                    }
+                }
+            }
+            system.debug('**** PARSED BARCOD E*** '+parsedBarcode_List);
+            if(!parsedBarcode_List.isEmpty()){
+                Map<string,Timeline__c> sfPatient_vs_Timeline_Map = new Map<string,Timeline__c>();
+                for(TimeLine__c tmln : [Select id,Stage__c,Patient__c,Patient__r.Barcode__c from TimeLine__c where Patient__c!=null AND Patient__r.Barcode__c!=null AND Patient__r.Barcode__c IN:parsedBarcode_List]){
+                    TimeLine__c temp_Timeline = new TimeLine__c();
+                    temp_Timeline.id = tmln.id;
+                    temp_Timeline.Stage__c = 'Review complete';
+                    sfPatient_vs_Timeline_Map.put(tmln.Patient__r.Barcode__c,temp_Timeline);
+                }
+                
+                //NOTIFY IF BARCODE DO NOT HAVE ACTIVE TIMELINE RECORD
+                if(!parsedBarcode_List.isEmpty()){
+                    if(sfPatient_vs_Timeline_Map.isEmpty()){
+                        for(String  keyBarcode : parsedBarcode_List){
+                             errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '+keyBarcode; 
+                        }
+                    }
+                    else{
+                        for(String  keyBarcode : parsedBarcode_List){
+                            if(!sfPatient_vs_Timeline_Map.containsKey(keyBarcode)) 
+                              errorCSV+='\nBARCODE '+keyBarcode+' : TIMELINE RECORD DO NOT EXIST: '; 
+                        }
+                    }
+                }
+                
+                try{                
+                    if(!sfPatient_vs_Timeline_Map.keySet().isEmpty()){
+                        System.debug('*** UPDATING TIMELINE');
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.update(sfPatient_vs_Timeline_Map.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### SUCCESS RESULT ### '+sr);
+                                updatedBarcodeList.add(sfPatient_vs_Timeline_Map.values()[trackerrorRow].id);
+                                successCSV += sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                timeLineIds += sfPatient_vs_Timeline_Map.values()[trackerrorRow].id+',';
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    errorCSV+='\nERROR'+sfPatient_vs_Timeline_Map.values()[trackerrorRow].Patient__r+','+err.getFields();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch(Exception ex){
+                    System.debug('*** Exception encountered '+ex.getMessage()+' Line No: '+ex.getLineNumber());
+                }
+            }
+        }
+        catch(Exception ex){
+            System.debug('@@@@ EXCEPTION ENCOUNTER @@@@@ ');
+            errorCSV+='\n EXCEPTION ENCOUNTER: Please contact system admin,'+ex.getMessage()+' '+ex.getCause();
+        }
+        
+        
+        system.debug('##### updated TIMELINE Review '+updatedBarcodeList);
+        system.debug('SUCCESS CSV ==> '+successCSV);
+        system.debug('Error CSV ==> '+errorCSV);
+        
+        resultSuccessError.put('SUCCESS',timeLineIds); 
+        resultSuccessError.put('ERROR',errorCSV);
+        
+        // return [Select id,patient__r.barcode__c from TimeLine__c where id IN:updatedBarcodeList];
+        return resultSuccessError;
+    }    
+    
+    /********************************************************************************************************************************
+* Description     : Parse Result Ready tab Phenotype.csv file for patient phenotype record update
+* Return Type     : list<TimeLine__c> Updated Patiend Barcodes List
+* ------------------------------------------------------------------------------------------------------------------------------
+* class called    : No
+* ******************************************************************************************************************************/
+    public static  Map<String,String> parsePhenotypeCSV(string stringBody,string attachmentName, Set<String> activatedBarcodes){
+        system.debug('**** REVIEW HELPER CALLED ***');
+        system.debug('*** BODY '+stringBody);
+        system.debug('*** NAME '+attachmentName);
+        
+        String pheoTypeIds = '';
+        List<String> csvFileLines = new List<String>();
+        List<Pheotype_info__c> barcodeForDataTable = new List<Pheotype_info__c>();
+        List<String> updatedBarcodeList = new List<String>();
+        Set<String>  parsedBarcode_List = new Set<String>();
+        Map<String,Pheotype_info__c> barcode_Phenotype_map = new Map<String,Pheotype_info__c>();
+        Map<String,Pheotype_info__c> phenotype_To_InsertMap = new Map<String,Pheotype_info__c>();
+        Map<String,Pheotype_info__c> phenotype_To_UpdateMap = new Map<String,Pheotype_info__c>();
+        Map<String,String> resultSuccessError = new Map<String,String>();
+        resultSuccessError.put('SUCCESS',null);
+        resultSuccessError.put('ERROR',errorCSV);
+        //Set<string> activatedBarcodes = new Set<String>();
+        system.debug('##### activatedBarcodes '+activatedBarcodes);
+        
+        Try{
+            if(stringBody!='')
+                csvFileLines = stringBody.split('\n'); 
+            
+            if(!csvFileLines.isEmpty()){
+                // IDENTIFY .CSV HEADDER INDEX
+                integer indexCheck = 0;
+                for(String index : csvFileLines[0].split(',')){
+                    if(index.trim()=='Barcode')
+                        headerIndex.put(index.trim(),indexCheck);
+                    if(index.trim()=='Bitter taste')
+                        headerIndex.put(index.trim(),indexCheck); 
+                    if(index.trim()=='BMI')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Childhood ear infections')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Cold sensitivity')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Eye color')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Folate')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Freckling')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Hair color')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Hair curliness')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Hair thickness')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Height')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Hypermobility')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Iris pattern')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Motion sickness')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Nose size')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Skin pigmentation')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Sleep duration')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Sleep efficiency')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Sleep latency')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Vitamin A')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Vitamin B12')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Vitamin B6')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Vitamin C')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Vitamin D')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='Vitamin E')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    if(index.trim()=='wakeup time')
+                        headerIndex.put(index.trim(),indexCheck);  
+                    indexCheck++;
+                }
+                System.debug('#### HEADDER MAP SIZE '+headerIndex.keySet().size());
+                System.debug('#### HEADDER MAP '+headerIndex);
+                if(headerIndex.keySet().size()!=27)
+                    return resultSuccessError;
+                
+                //ITERATE CSV ROWS
+                for(Integer i=1;i<csvFileLines.size();i++){
+                    system.debug('**ROWS '+i+' ==> '+csvFileLines[i]);
+                    List<String> columnList = new List<String>();
+                    columnList = csvFileLines[i].split(',');
+                    system.debug('### clolumn Size ==> '+columnList.size());
+                    
+                    //ITERATE CSV COLUMN
+                    /* for(Integer j=0;j<headerIndex.size();j++){
+if(columnList[j]!=null)
+parsedBarcode_List.add(columnList[j].trim()); 
+}*/
+                    Pheotype_info__c newPheno = new Pheotype_info__c();
+                    if(columnList.size()>=headerIndex.get('Bitter taste')+1)
+                        newPheno.Bitter_Taste__c = columnList[headerIndex.get('Bitter taste')].trim(); 
+                    if(columnList.size()>=headerIndex.get('BMI')+1)
+                        newPheno.BMI__c = columnList[headerIndex.get('BMI')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Childhood ear infections')+1)
+                        newPheno.Childhood_ear_infections__c = columnList[headerIndex.get('Childhood ear infections')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Cold sensitivity')+1)
+                        newPheno.Cold_sensitivity__c = columnList[headerIndex.get('Cold sensitivity')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Eye color')+1)
+                        newPheno.Eye_color__c = columnList[headerIndex.get('Eye color')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Folate')+1)
+                        newPheno.Folate__c = columnList[headerIndex.get('Folate')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Freckling')+1)
+                        newPheno.Freckling__c = columnList[headerIndex.get('Freckling')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Hair color')+1)
+                        newPheno.Hair_color__c = columnList[headerIndex.get('Hair color')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Hair curliness')+1)
+                        newPheno.Hair_curliness__c = columnList[headerIndex.get('Hair curliness')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Hair thickness')+1)
+                        newPheno.Hair_thickness__c = columnList[headerIndex.get('Hair thickness')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Height')+1)
+                        newPheno.Height__c = columnList[headerIndex.get('Height')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Hypermobility')+1)
+                        newPheno.Hypermobility__c = columnList[headerIndex.get('Hypermobility')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Iris pattern')+1)
+                        newPheno.Iris_pattern__c = columnList[headerIndex.get('Iris pattern')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Motion sickness')+1)
+                        newPheno.Motion_sickness__c = columnList[headerIndex.get('Motion sickness')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Nose size')+1)
+                        newPheno.Nose_size__c = columnList[headerIndex.get('Nose size')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Skin pigmentation')+1)
+                        newPheno.Skin_pigmentation__c = columnList[headerIndex.get('Skin pigmentation')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Sleep duration')+1)
+                        newPheno.Sleep_duration__c = columnList[headerIndex.get('Sleep duration')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Sleep efficiency')+1)
+                        newPheno.Sleep_efficiency__c = columnList[headerIndex.get('Sleep efficiency')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Sleep latency')+1)
+                        newPheno.Sleep_latency__c = columnList[headerIndex.get('Sleep latency')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Vitamin A')+1)
+                        newPheno.Vitamin_A__c = columnList[headerIndex.get('Vitamin A')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Vitamin B12')+1)
+                        newPheno.Vitamin_B12__c = columnList[headerIndex.get('Vitamin B12')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Vitamin B6')+1)
+                        newPheno.Vitamin_B6__c = columnList[headerIndex.get('Vitamin B6')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Vitamin C')+1)
+                        newPheno.Vitamin_C__c = columnList[headerIndex.get('Vitamin C')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Vitamin D')+1)
+                        newPheno.Vitamin_D__c = columnList[headerIndex.get('Vitamin D')].trim(); 
+                    if(columnList.size()>=headerIndex.get('Vitamin E')+1)
+                        newPheno.Vitamin_E__c = columnList[headerIndex.get('Vitamin E')].trim(); 
+                    if(columnList.size()>=headerIndex.get('wakeup time')+1)
+                        newPheno.wakeup_time__c = columnList[headerIndex.get('wakeup time')].trim(); 
+                    
+                    if(columnList.size()>=headerIndex.get('Barcode')+1)
+                        barcode_Phenotype_map.put(columnList[headerIndex.get('Barcode')].trim(),newPheno);
+                    
+                    //LIST OF BARCODE(active OR inactive)
+                    if(columnList.size()>=headerIndex.get('Barcode')+1){
+                        if(!activatedBarcodes.isEmpty() && activatedBarcodes.contains(columnList[headerIndex.get('Barcode')].trim())){
+                            parsedBarcode_List.add(columnList[headerIndex.get('Barcode')].trim());
+                        }
+                        else if(activatedBarcodes.isEmpty() || !activatedBarcodes.contains(columnList[headerIndex.get('Barcode')].trim())){
+                            errorCSV+='\n'+columnList[headerIndex.get('Barcode')].trim()+', INACTIVE';
+                        }
+                    }
+                }
+            }
+            system.debug('**** PARSED BARCOD VS PHENOTYPE map*** '+barcode_Phenotype_map);
+            system.debug('**** PARSED BARCOD *** '+parsedBarcode_List);
+            
+            if(!parsedBarcode_List.isEmpty()){
+                system.debug(' @@@@ Patient LIST '+[Select id,Barcode__c,(Select id,Patient__c,Patient__r.barcode__c,Bitter_Taste__c,BMI__c,Childhood_ear_infections__c,Cold_sensitivity__c,Eye_color__c,Folate__c,Freckling__c,Hair_color__c,Hair_curliness__c,Hair_thickness__c,Height__c,Hypermobility__c,Iris_pattern__c,Motion_sickness__c,Nose_size__c,Skin_pigmentation__c,Sleep_duration__c,Sleep_efficiency__c,Sleep_latency__c,Vitamin_A__c,Vitamin_B12__c,Vitamin_B6__c,Vitamin_C__c,Vitamin_D__c,Vitamin_E__c,wakeup_time__c from Pheotype_infos__r Limit 1) from Contact where Barcode__c!=null AND Barcode__c IN:parsedBarcode_List].size());
+                for(Contact patient : [Select id,Barcode__c,(Select id,Patient__c,Patient__r.barcode__c,Bitter_Taste__c,BMI__c,Childhood_ear_infections__c,Cold_sensitivity__c,Eye_color__c,Folate__c,Freckling__c,Hair_color__c,Hair_curliness__c,Hair_thickness__c,Height__c,Hypermobility__c,Iris_pattern__c,Motion_sickness__c,Nose_size__c,Skin_pigmentation__c,Sleep_duration__c,Sleep_efficiency__c,Sleep_latency__c,Vitamin_A__c,Vitamin_B12__c,Vitamin_B6__c,Vitamin_C__c,Vitamin_D__c,Vitamin_E__c,wakeup_time__c from Pheotype_infos__r Limit 1) from Contact where Barcode__c!=null AND Barcode__c IN:parsedBarcode_List]){
+                    // FOR PHENOTYPE INSERT
+                    if(patient.Pheotype_infos__r.size()==0){
+                        Pheotype_info__c newPhenoTyp = barcode_Phenotype_map.get(patient.Barcode__c);
+                        newPhenoTyp.Patient__c = patient.Id;
+                        newPhenoTyp.Patient__r = patient;
+                        phenotype_To_InsertMap.put(patient.Barcode__c,newPhenoTyp);
+                    }
+                    //FOR PHENOTYPE UPDATE
+                    if(patient.Pheotype_infos__r.size()==1){
+                        Pheotype_info__c newPhenoTyp = barcode_Phenotype_map.get(patient.Barcode__c);
+                        newPhenoTyp.id = patient.Pheotype_infos__r[0].id;
+                        newPhenoTyp.Patient__r = patient;
+                        phenotype_To_UpdateMap.put(patient.Barcode__c,newPhenoTyp);
+                    }
+                }
+                try{                
+                    if(!phenotype_To_InsertMap.keySet().isEmpty()){
+                        System.debug('*** INSERTING PHENOTYPE'+phenotype_To_InsertMap.values());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.insert(phenotype_To_InsertMap.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### SUCCESS INSERT RESULT ### '+sr);
+                                updatedBarcodeList.add(phenotype_To_InsertMap.values()[trackerrorRow].id);
+                                pheoTypeIds += phenotype_To_InsertMap.values()[trackerrorRow].id+',';
+                                successCSV += phenotype_To_InsertMap.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### INSERT ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    errorCSV+='\n'+phenotype_To_InsertMap.values()[trackerrorRow].Patient__r.Barcode__c+' ERROR'+' '+err.getFields();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if(!phenotype_To_UpdateMap.keySet().isEmpty()){
+                        System.debug('*** UPDATING PHENOTYPE'+phenotype_To_UpdateMap.values().size());
+                        Integer trackerrorRow = 0;
+                        Database.SaveResult[] srList = Database.update(phenotype_To_UpdateMap.values(), false); 
+                        for (Database.SaveResult sr : srList) {
+                            if(sr.isSuccess()){
+                                System.debug('### SUCCESS UPDATE RESULT ### '+sr);
+                                system.debug('OBJECT PHENO '+phenotype_To_UpdateMap.values()[trackerrorRow]);
+                                system.debug('OBJECT PHENO '+phenotype_To_UpdateMap.values()[trackerrorRow].patient__c);
+                                updatedBarcodeList.add(phenotype_To_UpdateMap.values()[trackerrorRow].id);
+                                successCSV += phenotype_To_UpdateMap.values()[trackerrorRow].Patient__r.Barcode__c+',True\n';
+                                pheoTypeIds += phenotype_To_UpdateMap.values()[trackerrorRow].id+',';
+                                trackerrorRow++;
+                            }
+                            else{
+                                // *** ERROR Tracking 
+                                System.debug('### UPDATE ERROR ### ');  
+                                for(Database.Error err : sr.getErrors()) {
+                                    errorCSV+='\nPatient id: '+phenotype_To_UpdateMap.values()[trackerrorRow].Patient__c+' ERROR'+' '+err.getFields();
+                                    trackerrorRow++;
+                                }
+                            }
+                        }
+                    }
+                    
+                }
+                catch(Exception ex){
+                    System.debug('*** Exception encountered '+ex.getMessage()+' Line No: '+ex.getLineNumber());
+                }
+            } 
+        }
+        catch(Exception ex){
+            System.debug('@@@@ EXCEPTION ENCOUNTER @@@@@ ');
+            errorCSV+='\n EXCEPTION ENCOUNTER: Please contact system admin,'+ex.getMessage()+' '+ex.getCause();
+        }
+        
+        
+        system.debug('##### INSERTED PHENOTYPE  '+updatedBarcodeList);
+        system.debug('SUCCESS CSV ==> '+successCSV);
+        system.debug('Error CSV ==> '+errorCSV);
+        //return updatedBarcodeList;
+        // Map<String,List<String>> resultSuccessError = new Map<String,List<String>>();
+        system.debug('@@@@ pheoTypeIds '+pheoTypeIds);
+        resultSuccessError.put('SUCCESS',pheoTypeIds);
+        resultSuccessError.put('ERROR',errorCSV);
+        
+        return resultSuccessError;
+        //return [Select id,patient__r.barcode__c from Pheotype_info__c where id IN:updatedBarcodeList];
+    }    
+    
+    //*******************************
+    //  WRAPPER CLASS FOR CSV PARSING
+    // ******************************
+    public class CSVWrapper {
+        public String Barcode;    
+        public decimal dnaConcentration;
+        public decimal dnaYield;
+        public decimal dnaNSU;
+        public Integer callRate;
+        
+        //CONSTRUCTOR 1
+        public CSVWrapper(String Barcode, decimal dnaConcentration, decimal dnaYield, decimal dnaNSU){
+            this.Barcode = Barcode;
+            this.dnaConcentration = dnaConcentration;
+            this.dnaYield = dnaYield;
+            this.dnaNSU = dnaNSU;
+        }
+        
+        //CONSTRUCTOR 2
+        public CSVWrapper(String Barcode, Integer callRate){
+            system.debug('*** CONSTRUCTOR 2');
+            this.Barcode = Barcode;
+            this.callrate = callRate;
+        }
+    }
+    
+}
