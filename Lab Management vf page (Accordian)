@@ -1,0 +1,709 @@
+<!-- DYNAMIC MENNU -->
+<!-- DYNAMIC ERROR -->
+<!-- UPLOAD CSV -->
+<!-- Controller: VF CONTROLLER & Helper -->
+
+
+<apex:page controller="Lab_Management_Controller"  >
+    <apex:slds />
+    <apex:pageMessages id="showmsg"></apex:pageMessages>
+    <body xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+        <!--apex:includeScript value="{!$Resource.JavascriptDataTableFile}"/>
+<apex:includeScript value="{!$Resource.JsDataTablemin}"/>
+<apex:stylesheet value="{URLFOR($Resourse.datatablecCstomCSS, 'styles.css')}"/-->
+        
+        
+        <apex:includescript value="https://code.jquery.com/jquery-3.5.1.js"/>
+        <apex:includescript value="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"/>
+        <apex:stylesheet value="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css"/>
+        <style>
+            .alert {
+            padding: 20px;
+            color: white;
+            }
+            
+            .closebtn {
+            margin-left: 15px;
+            color: white;
+            font-weight: bold;
+            float: right;
+            font-size: 22px;
+            line-height: 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            }
+            
+            .closebtn:hover {
+            color: black;
+            }
+        </style>
+        <div> 
+            <div class=" slds-page-header slds-page-header_record-home">
+                <div class="slds-page-header__row slds-p-around_medium">
+                    <div class="slds-page-header__col-title">
+                        <div class="slds-media">
+                            <div class="slds-media__figure">
+                                <span class="slds-icon_container slds-icon-standard-opportunity">
+                                    <svg class="slds-icon slds-page-header__icon" aria-hidden="true">
+                                        <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#record')}" />
+                                    </svg>
+                                </span>
+                            </div>
+                            <div class="slds-media__body">
+                                <div class="slds-page-header__name">
+                                    <div class="slds-page-header__name-title">
+                                        <h1>
+                                            <span>UPLOAD CSV</span>
+                                            <span style="position: absolute;"  class="slds-page-header__title slds-truncate" title="Inventory Check">Lab Management </span>
+                                        </h1>
+                                    </div>
+                                    <apex:form >
+                                        <apex:commandLink style="height: 2rem;margin-left: 67.5rem;" styleClass="slds-button slds-button_neutral" action="{!refreshPage}" > 
+                                            <svg  style="position: absolute;" class="slds-button__icon" aria-hidden="true"><use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#reset_password')}" /></svg>
+                                        </apex:commandLink>
+                                    </apex:form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slds-m-around_large demo-only" >
+                <div class="slds-tabs_default">
+                    <ul class="slds-tabs_default__nav" role="tablist">
+                        <li onclick="onclick_TabHandler(this,'tab-default-1')" class="slds-tabs_default__item slds-is-active custom_Tab" title="Opportunities" role="presentation">
+                            <a class="slds-tabs_default__link" href="javascript:void(0);" role="tab" tabindex="0" aria-selected="true" aria-controls="tab-default-1" id="tab-default-1__item">
+                                <span class="slds-tabs__left-icon">
+                                    <span class="slds-icon_container slds-icon-standard-opportunity" title="Opportunities">
+                                        <svg class="slds-icon slds-icon_small" aria-hidden="true">
+                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#record')}" />
+                                        </svg>
+                                    </span>
+                                </span>Swabs arrive at lab</a>
+                        </li>
+                        <li onclick="onclick_TabHandler(this,'tab-default-2')" class="slds-tabs_default__item custom_Tab" title="Cases" role="presentation">
+                            <a class="slds-tabs_default__link" href="javascript:void(0);" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-default-2" id="tab-default-2__item">
+                                <span class="slds-tabs__left-icon">
+                                    <span class="slds-icon_container slds-icon-standard-case" title="Cases">
+                                        <svg class="slds-icon slds-icon_small" aria-hidden="true">
+                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#record')}" />
+                                        </svg>
+                                    </span>
+                                </span>DNA extraction</a>
+                        </li>
+                        <li onclick="onclick_TabHandler(this,'tab-default-3')" class="slds-tabs_default__item custom_Tab" title="Products" role="presentation">
+                            <a class="slds-tabs_default__link" href="javascript:void(0);" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-default-3" id="tab-default-3__item">
+                                <span class="slds-tabs__left-icon">
+                                    <span class="slds-icon_container slds-icon-standard-product" title="Products">
+                                        <svg class="slds-icon slds-icon_small" aria-hidden="true">
+                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#record')}" />
+                                        </svg>
+                                    </span>
+                                </span>Genotyping</a>
+                        </li>
+                        <li onclick="onclick_TabHandler(this,'tab-default-4')" class="slds-tabs_default__item custom_Tab" title="Price Books" role="presentation">
+                            <a class="slds-tabs_default__link" href="javascript:void(0);" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-default-4" id="tab-default-4__item">
+                                <span class="slds-tabs__left-icon">
+                                    <span class="slds-icon_container slds-icon-standard-pricebook" title="Price Books">
+                                        <svg class="slds-icon slds-icon_small" aria-hidden="true">
+                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#record')}" />
+                                        </svg>
+                                    </span>
+                                </span>Review</a>
+                        </li>
+                        <li onclick="onclick_TabHandler(this,'tab-default-5')" class="slds-tabs_default__item custom_Tab" title="Contacts" role="presentation">
+                            <a class="slds-tabs_default__link" href="javascript:void(0);" role="tab" tabindex="-1" aria-selected="false" aria-controls="tab-default-5" id="tab-default-5__item">
+                                <span class="slds-tabs__left-icon">
+                                    <span class="slds-icon_container slds-icon-standard-contact" title="Contacts">
+                                        <svg class="slds-icon slds-icon_small" aria-hidden="true">
+                                            <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#record')}" />
+                                        </svg>
+                                    </span>
+                                </span>Result Ready</a>
+                        </li>
+                    </ul>
+                    <div id="tab-default-1" class=" slds-cards slds-tabs_default__content slds-show dynamicDiv" role="tabpanel" aria-labelledby="tab-default-1__item">
+                        <div style="display:{!toggelSwabMSG}; background-color:{!swabMSGcolor}">
+                            <div class="alert">
+                                <span class="closebtn" onclick="this.parentElement.style.display='none'; swabHide();">&times;</span> 
+                                <strong>{!apexSwabResult}</strong><button id="ErrorLogId" style="margin-left:19px;float: right;color: black; display:{!swabArriveLogButtonToggel}" onclick="downloadError({!swabArriveErrorFile})">
+                                download log
+                                </button>
+                            </div>
+                            
+                        </div>
+                        <apex:form >
+                            
+                            <div class="slds-card slds-card__header">
+                                <div class="slds-page-header__row">
+                                    <div class="slds-card slds-page-header__col-actions" >
+                                        <div class="slds-page-header__controls">
+                                            
+                                            <div class="slds-page-header__control">                           
+                                                <apex:inputFile value="{!swabsCSVFileBody}"  filename="{!swabsCSVName}" accept=".csv" style="margin-top: 0.5rem; color: green;"/>
+                                                <!--apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload CSV" action="{!importCSVFile}"/-->
+                                            </div>
+                                            
+                                            <div class="slds-page-header__control">
+                                                <ul class="slds-button-group-list">
+                                                    <li>
+                                                        <apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload Swabs arrived" action="{!parseSwabFile}"/>
+                                                        <!--button class="slds-button slds-button_neutral">Upload Active products</button-->
+                                                    </li>
+                                                    <li>
+                                                        <div Title="Download Template" class="slds-dropdown-trigger slds-dropdown-trigger_click"> 
+                                                            <a  style="height: 2rem;" class="slds-button slds-button_neutral" href="{!URLFOR($Action.Attachment.Download, arrivedSwabTemplate)}" download="Fi">
+                                                                <svg class="slds-button__icon" aria-hidden="true">
+                                                                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#download')}" />
+                                                                </svg>  
+                                                            </a>                                               
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-m-top_small">
+                                <div class="slds-page-header__col-details">
+                                    <table id="updatedSwabsTable" class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                        <thead>
+                                            <tr class="slds-line-height_reset">
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">S No.</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">SALESFORCE ID</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">BARCODE</div>
+                                                </th>
+                                            </tr>
+                                        </thead> 
+                                        <tbody>
+                                            <apex:repeat value="{!updatedSwabsSet}" var="patient">
+                                                <tr class="slds-hint-parent">
+                                                    <td data-label="SNO">
+                                                        <div class="slds-truncate" title="Prospecting">1</div>
+                                                    </td>
+                                                    <td data-label="ID"> 
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.Id}</div>
+                                                    </td>
+                                                    <td data-label="BARCODE"> 
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.Patient__r.Barcode__c}</div>
+                                                    </td>
+                                                </tr>
+                                            </apex:repeat>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </apex:form>
+                        <!--h2>Item One Content</h2-->
+                    </div>
+                    <div id="tab-default-2" class="slds-tabs_default__content slds-hide dynamicDiv" role="tabpanel" aria-labelledby="tab-default-2__item">
+                        <div style="display:{!toggelDNAMSG}; background-color:{!dnaMSGcolor}">
+                            <div class="alert">
+                                <span class="closebtn" onclick="this.parentElement.style.display='none';dnaHide()">&times;</span> 
+                                <strong>{!apexDNAResult}</strong><button id="ErrorLogId" style="margin-left:19px;float: right;color: black; display:{!dnaLogButtonToggel}" onclick="downloadError({!dnaErrorFile})">
+                                download log
+                                </button>
+                            </div>
+                            
+                        </div>
+                        
+                        <apex:form >
+                            
+                            <div class="slds-card slds-card__header">
+                                <div class="slds-page-header__row">
+                                    <div class="slds-card slds-page-header__col-actions" >
+                                        <div class="slds-page-header__controls">
+                                            
+                                            <div class="slds-page-header__control">                           
+                                                <apex:inputFile value="{!dnaCSVFileBody}"  filename="{!dnaCSVName}" accept=".csv" style="margin-top: 0.5rem; color: green;"/>
+                                                <!--apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload CSV" action="{!importCSVFile}"/-->
+                                            </div>
+                                            
+                                            <div class="slds-page-header__control">
+                                                <ul class="slds-button-group-list">
+                                                    <li>
+                                                        <apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload DNA extraction file" action="{!parseDNAFile}"/>
+                                                        <!--button class="slds-button slds-button_neutral">Upload Active products</button-->
+                                                    </li>
+                                                    <li>
+                                                        <div Title="Download Template" class="slds-dropdown-trigger slds-dropdown-trigger_click"> 
+                                                            <a  style="height: 2rem;" class="slds-button slds-button_neutral" href="{!URLFOR($Action.Attachment.Download, dnaExtractTemplate)}" download="Fi">
+                                                                <svg class="slds-button__icon" aria-hidden="true">
+                                                                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#download')}" />
+                                                                </svg>  
+                                                            </a>                                               
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-m-top_small">
+                                <div class="slds-page-header__col-details">
+                                    <table id="updatedDNAextnTable" class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                        <thead>
+                                            <tr class="slds-line-height_reset">
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">S No.</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">BARCODE</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">TimeLine update</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">LabStuff update</div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <apex:repeat value="{!updatedDNAResult}" var="patient">
+                                                <tr class="slds-hint-parent">
+                                                    <td data-label="SNO">
+                                                        <div class="slds-truncate" title="Prospecting">1</div>
+                                                    </td>
+                                                    <td data-label="BARCODE">
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.pBarcode}</div>
+                                                    </td>
+                                                    <td data-label="TimeLine">
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.isTimeLineUpdt}</div>
+                                                    </td>
+                                                    <td data-label="LabStuff">
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.isLabStuffUpdt}</div>
+                                                    </td>
+                                                </tr>
+                                            </apex:repeat>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </apex:form>
+                    </div>
+                    <div id="tab-default-3" class="slds-tabs_default__content slds-hide dynamicDiv" role="tabpanel" aria-labelledby="tab-default-3__item">
+                        <div style="display:{!toggelGenotypeMSG }; background-color:{!genotypeMSGcolor }">
+                            <div class="alert">
+                                <span class="closebtn" onclick="this.parentElement.style.display='none';genotypHide()">&times;</span> 
+                                <strong>{!apexGenoResult}</strong><button id="ErrorLogId" style="margin-left:19px;float: right;color: black; display:{!genoTypeButtonToggel}" onclick="downloadError({!genoTypeErrorFile})">
+                                download log
+                                </button>
+                            </div>
+                            
+                        </div>
+                        
+                        <apex:form >
+                            
+                            <div class="slds-card slds-card__header">
+                                <div class="slds-page-header__row">
+                                    <div class="slds-card slds-page-header__col-actions" >
+                                        <div class="slds-page-header__controls">
+                                            
+                                            <div class="slds-page-header__control">                           
+                                                <apex:inputFile value="{!genoCSVFileBody}"  filename="{!genoCSVName}" accept=".csv" style="margin-top: 0.5rem; color: green;"/>
+                                                <!--apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload CSV" action="{!importCSVFile}"/-->
+                                            </div>
+                                            
+                                            <div class="slds-page-header__control">
+                                                <ul class="slds-button-group-list">
+                                                    <li>
+                                                        <apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload Genotype file" action="{!parseGenotypeFile}"/>
+                                                        <!--button class="slds-button slds-button_neutral">Upload Active products</button-->
+                                                    </li>
+                                                    <li>
+                                                        <div Title="Download Template" class="slds-dropdown-trigger slds-dropdown-trigger_click"> 
+                                                            <a  style="height: 2rem;" class="slds-button slds-button_neutral" href="{!URLFOR($Action.Attachment.Download, genoTypeTemplate)}" download="Fi">
+                                                                <svg class="slds-button__icon" aria-hidden="true">
+                                                                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#download')}" />
+                                                                </svg>  
+                                                            </a>                                               
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-m-top_small">
+                                <div class="slds-page-header__col-details">
+                                    <table id="updatedGenotypeTable" class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                        <thead>
+                                            <tr class="slds-line-height_reset">
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">S No.</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">BARCODE</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">TimeLine update</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">LabStuff update</div>
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <apex:repeat value="{!updatedGenoTypeResult}" var="patient">
+                                                <tr class="slds-hint-parent">
+                                                    <td data-label="SNO">
+                                                        <div class="slds-truncate" title="Prospecting">1</div>
+                                                    </td>
+                                                    <td data-label="BARCODE">
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.pBarcode}</div>
+                                                    </td>
+                                                    <td data-label="TimeLine">
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.isTimeLineUpdt}</div>
+                                                    </td>
+                                                    <td data-label="LabStuff">
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.isLabStuffUpdt}</div>
+                                                    </td>
+                                                </tr>
+                                            </apex:repeat>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </apex:form>
+                    </div>
+                    <div id="tab-default-4" class="slds-tabs_default__content slds-hide dynamicDiv" role="tabpanel" aria-labelledby="tab-default-4__item">
+                        <div style="display:{!toggelReviewMSG}; background-color:{!reviewMSGcolor}">
+                            <div class="alert">
+                                <span class="closebtn" onclick="this.parentElement.style.display='none';reviewtypHide()">&times;</span> 
+                                <strong>{!apexReviewResult}</strong><button id="ErrorLogId" style="margin-left:19px;float: right;color: black; display:{!reviewLogButtonToggel }" onclick="downloadError({!reviewErrorFile})">
+                                download log
+                                </button>
+                            </div>
+                            
+                        </div>
+                        <apex:form >
+                            
+                            <div class="slds-card slds-card__header">
+                                <div class="slds-page-header__row">
+                                    <div class="slds-card slds-page-header__col-actions" >
+                                        <div class="slds-page-header__controls">
+                                            
+                                            <div class="slds-page-header__control">                           
+                                                <apex:inputFile value="{!reviewCSVFileBody}"  filename="{!reviewCSVName}" accept=".csv" style="margin-top: 0.5rem; color: green;"/>
+                                                <!--apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload CSV" action="{!importCSVFile}"/-->
+                                            </div>
+                                            
+                                            <div class="slds-page-header__control">
+                                                <ul class="slds-button-group-list">
+                                                    <li>
+                                                        <apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload Review file" action="{!parseReviewFile}" />
+                                                        <!--button class="slds-button slds-button_neutral">Upload Active products</button-->
+                                                    </li>
+                                                    <li>
+                                                        <div Title="Download Template" class="slds-dropdown-trigger slds-dropdown-trigger_click"> 
+                                                            <a  style="height: 2rem;" class="slds-button slds-button_neutral" href="{!URLFOR($Action.Attachment.Download, reviewTemplate)}" download="Fi">
+                                                                <svg class="slds-button__icon" aria-hidden="true">
+                                                                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#download')}" />
+                                                                </svg>  
+                                                            </a>                                               
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-m-top_small">
+                                <div class="slds-page-header__col-details">
+                                    <table id="updatedReviewTable" class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                        <thead>
+                                            <tr class="slds-line-height_reset">
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">S No.</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">SALESFORCE ID</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">BARCODE</div>
+                                                </th>
+                                            </tr>
+                                        </thead> 
+                                        <tbody>
+                                            <apex:repeat value="{!updatedReviewResult}" var="patient">
+                                                <tr class="slds-hint-parent">
+                                                    <td data-label="SNO">
+                                                        <div class="slds-truncate" title="Prospecting">1</div>
+                                                    </td>
+                                                    <td data-label="ID"> 
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.Id}</div>
+                                                    </td>
+                                                    <td data-label="BARCODE"> 
+                                                        <div class="slds-truncate" title="Prospecting">{!patient.Patient__r.Barcode__c}</div>
+                                                    </td>
+                                                </tr>
+                                            </apex:repeat>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </apex:form>
+                    </div>
+                    <div id="tab-default-5" class="slds-tabs_default__content slds-hide dynamicDiv" role="tabpanel" aria-labelledby="tab-default-5__item">
+                        <div id="msgId" style="display:{!toggelfinalResultMSG }; background-color:{!resultMSGcolor }">
+                            <div class="alert">
+                                <span class="closebtn" onclick="this.parentElement.style.display='none';phenotypeResultHide()">&times;</span> 
+                                <strong>{!apexFinalResult}</strong><button id="ErrorLogId" style="margin-left:19px;float: right;color: black; display:{!phenoLogButtonToggel }" onclick="downloadError({!phenoErrorFile})">
+                                download log
+                                </button>
+                            </div>
+                            
+                        </div>
+                        <apex:form >
+                            
+                            <div class="slds-card slds-card__header">
+                                <div class="slds-page-header__row">
+                                    <div class="slds-card slds-page-header__col-actions" >
+                                        <div class="slds-page-header__controls">
+                                            
+                                            <div class="slds-page-header__control">                           
+                                                <apex:inputFile value="{!resultCSVFileBody}"  filename="{!resultCSVName}" accept=".csv" style="margin-top: 0.5rem; color: green;"/>
+                                                <!--apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload CSV" action="{!importCSVFile}"/-->
+                                            </div>
+                                            
+                                            <div class="slds-page-header__control">
+                                                <ul class="slds-button-group-list">
+                                                    <li>
+                                                        <apex:commandButton styleclass="slds-button slds-button_neutral slds-button_stateful slds-not-selected" value="Upload Phenotype file" action="{!parseFinalResultFile}" />
+                                                        <!--button class="slds-button slds-button_neutral">Upload Active products</button-->
+                                                     </li>
+                                                    <li>
+                                                        <div Title="Download Template" class="slds-dropdown-trigger slds-dropdown-trigger_click"> 
+                                                            <a  style="height: 2rem;" class="slds-button slds-button_neutral" href="{!URLFOR($Action.Attachment.Download, resultReadyTemplate)}" download="Fi">
+                                                                <svg class="slds-button__icon" aria-hidden="true">
+                                                                    <use xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="{!URLFOR($Asset.SLDS, '/assets/icons/action-sprite/svg/symbols.svg#download')}" />
+                                                                </svg>  
+                                                            </a>                                               
+                                                        </div>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="slds-m-top_small">
+                                <div class="slds-page-header__col-details">
+                                    <table id="updatedPheotypeTable" class="slds-table slds-table_cell-buffer slds-table_bordered">
+                                        <thead>
+                                            <tr class="slds-line-height_reset">
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">S No.</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">SALESFORCE ID</div>
+                                                </th>
+                                                <th class="" scope="col">
+                                                    <div class="slds-truncate" title="Close Date">BARCODE</div>
+                                                </th>
+                                            </tr>
+                                        </thead> 
+                                        <tbody>
+                                            <apex:repeat value="{!updatedResultSet}" var="PhenoType">
+                                                <tr class="slds-hint-parent">
+                                                    <td data-label="SNO">
+                                                        <div class="slds-truncate" title="Prospecting">1</div>
+                                                    </td>
+                                                    <td data-label="ID"> 
+                                                        <div class="slds-truncate" title="Prospecting">{!PhenoType.Id}</div>
+                                                    </td>
+                                                    <td data-label="BARCODE"> 
+                                                        <div class="slds-truncate" title="Prospecting">{!PhenoType.Patient__r.Barcode__c}</div>
+                                                    </td>
+                                                </tr>
+                                            </apex:repeat>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </apex:form>
+                    </div>
+                </div>
+            </div>
+        </div>   
+        <apex:form id="fomID">
+            <apex:actionFunction name="swabHide" action="{!hideMsg}"  reRender="fomID">
+                <apex:param name="swabToToggel" value="none" assignTo="{!toggelSwabMSG}"/>
+            </apex:actionFunction>
+            
+            <apex:actionFunction name="dnaHide" action="{!hideMsg}"  reRender="fomID">
+                <apex:param name="dnaToToggel" value="none" assignTo="{!toggelDNAMSG}"/>
+            </apex:actionFunction>
+            
+            <apex:actionFunction name="genotypHide" action="{!hideMsg}"  reRender="fomID">
+                <apex:param name="genoToToggel" value="none" assignTo="{!toggelGenotypeMSG }"/>
+            </apex:actionFunction>
+            
+            <apex:actionFunction name="reviewtypHide" action="{!hideMsg}"  reRender="fomID">
+                <apex:param name="reviewToToggel" value="none" assignTo="{!toggelReviewMSG}"/>
+            </apex:actionFunction>
+            
+            <apex:actionFunction name="phenotypeResultHide" action="{!hideMsg}"  reRender="fomID">
+                <apex:param name="resultToToggel" value="none" assignTo="{!toggelfinalResultMSG}"/>
+            </apex:actionFunction>
+        </apex:form>
+    </body>
+    <script>
+    function downloadErrorFile(fileName, urlData) {
+        console.log('***calling2');
+        var encodedUri = encodeURI(urlData);
+        window.open(encodedUri);
+    }
+    
+    function downloadError(apexErrorData){
+        console.log('***calling '+String(apexErrorData));
+        var data = apexErrorData; 
+          downloadErrorFile('ERROR.csv', 'data:text/csv;charset=utf-8,' + data);
+        
+    }
+    
+    
+    function jsMsgClose(msgRef){
+        console.log('*****MSG hide'+ msgRef.parentElement.style.display);
+        msgRef.parentElement.style.display='none';
+        swabHide();
+    }
+    
+    /*function swabHide(){
+    	console.log('*****call Apex');
+    }*/
+    
+    function onclick_TabHandler(comp,divToShowID){
+        console.log('*** FUNCTION CALL ***');
+        console.log(comp);
+        console.log(divToShowID);
+        //DYNAMIC TAB STEPS
+        //STEP 1
+        var i;
+        var tabHead = document.getElementsByClassName("custom_Tab");
+        console.log('SIZE '+tabHead);
+        for (i = 0; i < tabHead.length; i++) {
+            tabHead[i].classList.remove("slds-is-active");
+        }
+        
+        //STEP 2
+        comp.classList.add("slds-is-active");
+        
+        //STEP 3
+        var j;
+        var toRenderDiv = document.getElementsByClassName("dynamicDiv");
+        for (j = 0; j < tabHead.length; j++) {
+            toRenderDiv[j].classList.add("slds-hide");
+            toRenderDiv[j].classList.remove("slds-show");
+        }
+        
+        //STEP4
+        var showComp = document.getElementById(divToShowID);
+        showComp.classList.remove("slds-hide");
+        showComp.classList.add("slds-show"); 
+    }
+    
+    //SWABS TABLE
+    $(document).ready(function() {
+        var t = $('#updatedSwabsTable').DataTable( {
+            "columnDefs": [ {
+                "searchable": false,
+                "orderable": false,
+                "targets": 0
+            } ],
+            "order": [[ 1, 'asc' ]]
+        } );
+        
+        t.on( 'order.dt search.dt', function () {
+            t.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
+                cell.innerHTML = i+1;
+            } );
+        } ).draw();
+    } );
+    
+    //DNA TABLE
+    $(document).ready(function() {
+        var t = $('#updatedDNAextnTable').DataTable( {
+            "columnDefs": [ {
+                "searchable": false,
+                "orderable": false,
+                "targets": 0
+            } ],
+            "order": [[ 1, 'asc' ]]
+        } );
+        
+        t.on( 'order.dt search.dt', function () {
+            t.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
+                cell.innerHTML = i+1;
+            } );
+        } ).draw();
+    } );
+    
+    //GENOTYPE TABLE
+    $(document).ready(function() {
+        var t = $('#updatedGenotypeTable').DataTable( {
+            "columnDefs": [ {
+                "searchable": false,
+                "orderable": false,
+                "targets": 0
+            } ],
+            "order": [[ 1, 'asc' ]]
+        } );
+        
+        t.on( 'order.dt search.dt', function () {
+            t.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
+                cell.innerHTML = i+1;
+            } );
+        } ).draw();
+    } );
+    
+    //REVIEW TABLE
+    $(document).ready(function() {
+        var t = $('#updatedReviewTable').DataTable( {
+            "columnDefs": [ {
+                "searchable": false,
+                "orderable": false,
+                "targets": 0
+            } ],
+            "order": [[ 1, 'asc' ]]
+        } );
+        
+        t.on( 'order.dt search.dt', function () {
+            t.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
+                cell.innerHTML = i+1;
+            } );
+        } ).draw();
+    } );
+    
+    //RESULT PHENOTYPE TABLE
+    $(document).ready(function() {
+        var t = $('#updatedPheotypeTable').DataTable( {
+            "columnDefs": [ {
+                "searchable": false,
+                "orderable": false,
+                "targets": 0
+            } ],
+            "order": [[ 1, 'asc' ]]
+        } );
+        
+        t.on( 'order.dt search.dt', function () {
+            t.column(0, {search:'applied', order:'applied'}).nodes().each( function (cell, i) {
+                cell.innerHTML = i+1;
+            } );
+        } ).draw();
+    } );
+    
+    
+    </script>
+</apex:page>
+
+
