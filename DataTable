@@ -1,0 +1,25 @@
+***********************************************
+datatable 1: horizontal scrobal
+***********************************************
+referal link:  https://datatables.net/examples/basic_init/scroll_x.html
+
+<apex:includeScript value="https://code.jquery.com/jquery-3.5.1.js"/>
+<apex:includeScript value="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"/>
+<apex:stylesheet value="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css"/>
+
+<table  id="example1" class="display nowrap" style="width:100%">
+  
+</table>
+
+<script>
+    $(document).ready(function() {
+        $('#example1').DataTable( {
+            "scrollX": true
+        } );
+    } );
+</script>
+
+
+***********************************************
+datatable 2: 
+***********************************************
